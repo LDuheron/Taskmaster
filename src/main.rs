@@ -1,10 +1,12 @@
-use parsing::Config;
-use std::error::Error;
-mod parsing;
+mod error;
+mod parser;
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub use self::error::{Error, Result};
+use parser::Config;
+
+fn main() -> Result<()> {
     let mut config: Config = Config::new();
-    config.parse_config_file(String::from("config.ini"))?;
+    config.parse_config_file("config.ini".into())?;
     //println!("Config: {:?}", config.map);
     Ok(())
 }

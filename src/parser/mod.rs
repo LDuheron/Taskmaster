@@ -1,3 +1,4 @@
+use crate::{Error, Result};
 use configparser::ini::Ini;
 use std::collections::HashMap;
 
@@ -72,31 +73,31 @@ impl Config {
         }
     }
 
-    fn _parse_command(raw: &RawConfig) -> Result<Option<String>, String> {
+    fn _parse_command(raw: &RawConfig) -> Result<Option<String>> {
         match raw.get("command") {
             Some(c) => {
                 let command = c.clone();
                 if command.as_ref().unwrap().is_empty() {
-                    Err("command parameter can't be empty".to_string())
+                    Err(Error::FieldCommandIsEmpty)
                 } else {
                     Ok(command)
                 }
             }
-            None => Err("command parameter is not set".to_string()),
+            None => Err(Error::FieldCommandIsNotSet),
         }
     }
 
-    fn _parse_num_procs(raw: &RawConfig) -> Result<u32, String> {
+    fn _parse_num_procs(raw: &RawConfig) -> Result<u32> {
         match raw.get("numprocs") {
             Some(Some(s)) => match s.parse::<u32>() {
                 Ok(n) => Ok(n),
-                Err(_) => Err("bad value for numproc".to_string()),
+                Err(_) => Err(Error::FieldNumProcsIsNotPositiveNumber { str: s.into() }),
             },
             _ => Ok(Job::default().num_procs),
         }
     }
 
-    fn _parse_job(raw: &RawConfig) -> Result<Job, String> {
+    fn _parse_job(raw: &RawConfig) -> Result<Job> {
         let command: Option<String> = Self::_parse_command(&raw)?;
         let num_procs: u32 = Self::_parse_num_procs(&raw)?;
         Ok(Job {
@@ -106,12 +107,13 @@ impl Config {
         })
     }
 
-    pub fn parse_config_file(&mut self, config_path: String) -> Result<(), String> {
+    pub fn parse_config_file(&mut self, config_path: String) -> Result<()> {
         let mut parser = Ini::new();
         let cfg = parser.load(config_path)?;
+        // without Error::Default we can do this:
+        // .map_err(|e| Error::SomeError(e))?;
         for entry in &cfg {
-            self.map
-                .insert(entry.0.to_string(), Self::_parse_job(&entry.1)?);
+            self.map.insert(entry.0.into(), Self::_parse_job(&entry.1)?);
         }
         println!("{:#?}", self);
         Ok(())
