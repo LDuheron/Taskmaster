@@ -24,8 +24,17 @@ class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
 
 	def do_start(self, arg):
-		#checker si l'arg corespond au config file
-		print("Restart command :) ")
+		# checker si l'arg corespond au config file
+		print("Start command :) ")
+	
+	def do_stop(self, arg):
+		print("Stop command")
+
+	def do_restart(self, arg):
+		print("Restart command")
+	
+	def do_quit(self, arg):
+		return True
 
 	def cmd_loop(self):
 		while (42):
