@@ -30,7 +30,10 @@ class InputInterpretor(cmd.Cmd):
 	def cmd_loop(self):
 		while (42):
 			char = read_char()
-			self.cmdloop(char)
+			if (char == '\x1b[A'):
+				continue
+			else:
+				self.cmdloop(char)
 
 if __name__ == "__main__":
 	InputInterpretor().cmdloop()
