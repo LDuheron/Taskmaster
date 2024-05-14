@@ -25,7 +25,7 @@ pub enum StopSignals {
 
 #[derive(Debug)]
 pub struct Job {
-    command: Option<String>,
+    command: String,
     num_procs: u32,
     auto_start: bool,
     auto_restart: AutorestartOptions,
@@ -44,7 +44,7 @@ pub struct Job {
 impl Default for Job {
     fn default() -> Self {
         Job {
-            command: None,
+            command: String::new(),
             num_procs: 1,
             auto_start: true,
             auto_restart: AutorestartOptions::UnexpectedExit,
@@ -59,6 +59,26 @@ impl Default for Job {
             work_dir: None,
             umask: None,
         }
+    }
+}
+
+// TODO: fix enums
+impl std::cmp::PartialEq for Job {
+    fn eq(&self, other: &Self) -> bool {
+        self.command == other.command
+            && self.num_procs == other.num_procs
+            && self.auto_start == other.auto_start
+            // && self.auto_restart == other.auto_restart
+            && self.expected_return_codes == other.expected_return_codes
+            && self.start_secs == other.start_secs
+            && self.start_retries == other.start_retries
+            // && self.stop_signal == other.stop_signal
+            && self.stop_wait_secs == other.stop_wait_secs
+            && self.stdin_file == other.stdin_file
+            && self.stdout_file == other.stdout_file
+            && self.environment == other.environment
+            && self.work_dir == other.work_dir
+            && self.umask == other.umask
     }
 }
 
@@ -80,6 +100,7 @@ impl Config {
         default: T,
     ) -> Result<T> {
         let type_name: String = std::any::type_name::<T>().into();
+        // TODO: try to use unwrap or default
         match raw.get(&entry_name) {
             Some(Some(b)) => Ok(b.parse::<T>().map_err(|_| Error::CantParseEntry {
                 entry_name,
@@ -97,17 +118,17 @@ impl Config {
         )
     }
 
-    fn _parse_command(raw: &RawConfig) -> Result<Option<String>> {
+    fn _parse_command(raw: &RawConfig) -> Result<String> {
         match raw.get("command") {
-            Some(c) => {
+            Some(Some(c)) => {
                 let command = c.clone();
-                if command.as_ref().unwrap().is_empty() {
+                if command.is_empty() {
                     Err(Error::FieldCommandIsEmpty)
                 } else {
                     Ok(command)
                 }
             }
-            None => Err(Error::FieldCommandIsNotSet),
+            _ => Err(Error::FieldCommandIsNotSet),
         }
     }
 
@@ -119,7 +140,7 @@ impl Config {
         )
     }
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
-        let command: Option<String> = Self::_parse_command(&raw)?;
+        let command: String = Self::_parse_command(&raw)?;
         let num_procs: u32 = Self::_parse_num_procs(&raw)?;
         let auto_start: bool = Self::_parse_autostart(&raw)?;
         Ok(Job {
@@ -139,7 +160,9 @@ impl Config {
 
     pub fn parse_config_file(&mut self, config_path: String) -> Result<()> {
         let mut parser = Ini::new();
-        let cfg = parser.load(config_path)?;
+        let cfg = parser
+            .load(config_path)
+            .map_err(|e| Error::CantLoadFile(e))?;
         Self::parse_content_of_parserconfig(self, cfg)?;
         println!("{:#?}", self);
         Ok(())
@@ -153,13 +176,34 @@ mod tests {
     type Result<T> = std::result::Result<T, Error>;
 
     #[test]
-    fn working_cfg() -> Result<()> {
+    fn default_cfg() -> Result<()> {
         let config_parser = Ini::new().read(String::from(
-            "[cat]
-            command=/bin/test",
+            "[test]
+            command: test",
         ))?;
         let mut config = Config::new();
         config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get("test").unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command: String::from("test"),
+                num_procs: 1,
+                auto_start: true,
+                auto_restart: AutorestartOptions::UnexpectedExit,
+                expected_return_codes: vec![1],
+                start_secs: 1,
+                start_retries: 3,
+                stop_signal: vec![StopSignals::SIGTERM],
+                stop_wait_secs: 10,
+                stdin_file: None,
+                stdout_file: None,
+                environment: HashMap::new(),
+                work_dir: None,
+                umask: None,
+            },
+        );
+        println!("{:#?}", config);
         Ok(())
     }
 }
