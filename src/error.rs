@@ -3,9 +3,15 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[derive(Debug)]
 pub enum Error {
     // -- parser
-    FieldNumProcsIsNotPositiveNumber { str: String },
+    FieldNumProcsIsNotPositiveNumber {
+        str: String,
+    },
     FieldCommandIsEmpty,
     FieldCommandIsNotSet,
+    CantParseEntry {
+        entry_name: String,
+        type_name: String,
+    },
     // -- to others errors
     Default(String),
 }

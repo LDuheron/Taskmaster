@@ -2,6 +2,7 @@ use crate::{Error, Result};
 use configparser::ini::Ini;
 use std::collections::HashMap;
 
+type ConfigParserContent = HashMap<String, HashMap<String, Option<String>>>;
 type RawConfig = HashMap<String, Option<String>>;
 
 #[derive(Debug)]
@@ -73,6 +74,29 @@ impl Config {
         }
     }
 
+    fn _parse_raw_config_entry<T: std::str::FromStr>(
+        raw: &RawConfig,
+        entry_name: String,
+        default: T,
+    ) -> Result<T> {
+        let type_name: String = std::any::type_name::<T>().into();
+        match raw.get(&entry_name) {
+            Some(Some(b)) => Ok(b.parse::<T>().map_err(|_| Error::CantParseEntry {
+                entry_name,
+                type_name,
+            })?),
+            _ => Ok(default),
+        }
+    }
+
+    fn _parse_autostart(raw: &RawConfig) -> Result<bool> {
+        Self::_parse_raw_config_entry::<bool>(
+            raw,
+            String::from("autostart"),
+            Job::default().auto_start,
+        )
+    }
+
     fn _parse_command(raw: &RawConfig) -> Result<Option<String>> {
         match raw.get("command") {
             Some(c) => {
@@ -88,34 +112,54 @@ impl Config {
     }
 
     fn _parse_num_procs(raw: &RawConfig) -> Result<u32> {
-        match raw.get("numprocs") {
-            Some(Some(s)) => match s.parse::<u32>() {
-                Ok(n) => Ok(n),
-                Err(_) => Err(Error::FieldNumProcsIsNotPositiveNumber { str: s.into() }),
-            },
-            _ => Ok(Job::default().num_procs),
-        }
+        Self::_parse_raw_config_entry::<u32>(
+            raw,
+            String::from("numprocs"),
+            Job::default().num_procs,
+        )
     }
-
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
         let command: Option<String> = Self::_parse_command(&raw)?;
         let num_procs: u32 = Self::_parse_num_procs(&raw)?;
+        let auto_start: bool = Self::_parse_autostart(&raw)?;
         Ok(Job {
             command,
             num_procs,
+            auto_start,
             ..Default::default()
         })
+    }
+
+    pub fn parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
+        for entry in cfg {
+            self.map.insert(entry.0.into(), Self::_parse_job(&entry.1)?);
+        }
+        Ok(())
     }
 
     pub fn parse_config_file(&mut self, config_path: String) -> Result<()> {
         let mut parser = Ini::new();
         let cfg = parser.load(config_path)?;
-        // without Error::Default we can do this:
-        // .map_err(|e| Error::SomeError(e))?;
-        for entry in &cfg {
-            self.map.insert(entry.0.into(), Self::_parse_job(&entry.1)?);
-        }
+        Self::parse_content_of_parserconfig(self, cfg)?;
         println!("{:#?}", self);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    type Error = Box<dyn std::error::Error>;
+    type Result<T> = std::result::Result<T, Error>;
+
+    #[test]
+    fn working_cfg() -> Result<()> {
+        let config_parser = Ini::new().read(String::from(
+            "[cat]
+            command=/bin/test",
+        ))?;
+        let mut config = Config::new();
+        config.parse_content_of_parserconfig(config_parser)?;
         Ok(())
     }
 }
