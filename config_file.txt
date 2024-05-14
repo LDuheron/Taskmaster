@@ -6,3 +6,7 @@ Contenu d'un config file
 - option de demarrage : autostart="true"
 - option de redemarrage : autorestart="true"
 - stdout
+
+[]
+name = randomName
+path = ./
