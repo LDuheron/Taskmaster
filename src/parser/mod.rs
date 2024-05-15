@@ -5,14 +5,16 @@ use std::collections::HashMap;
 type ConfigParserContent = HashMap<String, HashMap<String, Option<String>>>;
 type RawConfig = HashMap<String, Option<String>>;
 
-#[derive(Debug)]
+#[allow(dead_code)]
+#[derive(Debug, PartialEq)]
 pub enum AutorestartOptions {
     Always,
     Never,
     UnexpectedExit,
 }
 
-#[derive(Debug)]
+#[allow(dead_code)]
+#[derive(Debug, PartialEq)]
 pub enum StopSignals {
     SIGHUP = 1,
     SIGINT = 2,
@@ -62,17 +64,16 @@ impl Default for Job {
     }
 }
 
-// TODO: fix enums
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
             && self.num_procs == other.num_procs
             && self.auto_start == other.auto_start
-            // && self.auto_restart == other.auto_restart
+            && self.auto_restart == other.auto_restart
             && self.expected_return_codes == other.expected_return_codes
             && self.start_secs == other.start_secs
             && self.start_retries == other.start_retries
-            // && self.stop_signal == other.stop_signal
+            && self.stop_signal == other.stop_signal
             && self.stop_wait_secs == other.stop_wait_secs
             && self.stdin_file == other.stdin_file
             && self.stdout_file == other.stdout_file
@@ -94,16 +95,17 @@ impl Config {
         }
     }
 
-    fn _parse_raw_config_entry<T: std::str::FromStr>(
+    fn _parse_raw_config_field<T: std::str::FromStr>(
         raw: &RawConfig,
-        entry_name: String,
+        field_name: String,
         default: T,
     ) -> Result<T> {
         let type_name: String = std::any::type_name::<T>().into();
         // TODO: try to use unwrap or default
-        match raw.get(&entry_name) {
-            Some(Some(b)) => Ok(b.parse::<T>().map_err(|_| Error::CantParseEntry {
-                entry_name,
+        match raw.get(&field_name) {
+            Some(Some(value)) => Ok(value.parse::<T>().map_err(|_| Error::CantParseField {
+                field_name,
+                value: value.to_string(),
                 type_name,
             })?),
             _ => Ok(default),
@@ -111,7 +113,7 @@ impl Config {
     }
 
     fn _parse_autostart(raw: &RawConfig) -> Result<bool> {
-        Self::_parse_raw_config_entry::<bool>(
+        Self::_parse_raw_config_field::<bool>(
             raw,
             String::from("autostart"),
             Job::default().auto_start,
@@ -133,12 +135,13 @@ impl Config {
     }
 
     fn _parse_num_procs(raw: &RawConfig) -> Result<u32> {
-        Self::_parse_raw_config_entry::<u32>(
+        Self::_parse_raw_config_field::<u32>(
             raw,
             String::from("numprocs"),
             Job::default().num_procs,
         )
     }
+
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
         let command: String = Self::_parse_command(&raw)?;
         let num_procs: u32 = Self::_parse_num_procs(&raw)?;
@@ -153,16 +156,28 @@ impl Config {
 
     pub fn parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
         for entry in cfg {
-            self.map.insert(entry.0.into(), Self::_parse_job(&entry.1)?);
+            let entry_name = entry.0.clone();
+            let job = match Self::_parse_job(&entry.1) {
+                Err(e) => {
+                    return Err(Error::CantParseEntry {
+                        entry_name,
+                        e: e.to_string(),
+                    })
+                }
+                Ok(content) => content,
+            };
+            self.map.insert(entry_name, job);
+        }
+        self.map.remove("default");
+        if self.map.is_empty() {
+            return Err(Error::NoJobEntry);
         }
         Ok(())
     }
 
     pub fn parse_config_file(&mut self, config_path: String) -> Result<()> {
         let mut parser = Ini::new();
-        let cfg = parser
-            .load(config_path)
-            .map_err(|e| Error::CantLoadFile(e))?;
+        let cfg = parser.load(config_path).unwrap();
         Self::parse_content_of_parserconfig(self, cfg)?;
         println!("{:#?}", self);
         Ok(())
@@ -172,22 +187,53 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    type Error = Box<dyn std::error::Error>;
     type Result<T> = std::result::Result<T, Error>;
 
+    fn get_config_parser_and_config(content: String) -> (ConfigParserContent, Config) {
+        let config_parser = Ini::new().read(content).unwrap();
+        let config = Config::new();
+        (config_parser, config)
+    }
+
     #[test]
-    fn default_cfg() -> Result<()> {
-        let config_parser = Ini::new().read(String::from(
-            "[test]
-            command: test",
-        ))?;
-        let mut config = Config::new();
+    fn no_job() -> Result<()> {
+        let (config_parser, mut config) = get_config_parser_and_config("".into());
+        assert_eq!(
+            config.parse_content_of_parserconfig(config_parser),
+            Err(Error::NoJobEntry)
+        );
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn only_global() -> Result<()> {
+        let (config_parser, mut config) = get_config_parser_and_config(String::from(
+            "command=test
+             numprocs=2",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert_eq!(val, Err(Error::NoJobEntry));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn global_and_another_job() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "command=test
+             numprocs=2
+             [{job_name}]
+             command={command}",
+        ));
         config.parse_content_of_parserconfig(config_parser)?;
-        let job: &Job = config.map.get("test").unwrap();
+        let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
             Job {
-                command: String::from("test"),
+                command,
                 num_procs: 1,
                 auto_start: true,
                 auto_restart: AutorestartOptions::UnexpectedExit,
@@ -203,7 +249,148 @@ mod tests {
                 umask: None,
             },
         );
-        println!("{:#?}", config);
+        assert_eq!(config.map.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn default() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command: {command}",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                num_procs: 1,
+                auto_start: true,
+                auto_restart: AutorestartOptions::UnexpectedExit,
+                expected_return_codes: vec![1],
+                start_secs: 1,
+                start_retries: 3,
+                stop_signal: vec![StopSignals::SIGTERM],
+                stop_wait_secs: 10,
+                stdin_file: None,
+                stdout_file: None,
+                environment: HashMap::new(),
+                work_dir: None,
+                umask: None,
+            },
+        );
+        assert_eq!(config.map.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn empty_command() -> Result<()> {
+        let (config_parser, mut config) = get_config_parser_and_config(String::from(
+            "[test]
+             command:",
+        ));
+        assert_eq!(
+            config.parse_content_of_parserconfig(config_parser),
+            Err(Error::CantParseEntry {
+                entry_name: String::from("test"),
+                e: Error::FieldCommandIsEmpty.to_string(),
+            })
+        );
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn no_command() -> Result<()> {
+        let (config_parser, mut config) = get_config_parser_and_config(String::from(
+            "[test]
+             numprocs: 2",
+        ));
+        assert_eq!(
+            config.parse_content_of_parserconfig(config_parser),
+            Err(Error::CantParseEntry {
+                entry_name: String::from("test"),
+                e: Error::FieldCommandIsNotSet.to_string(),
+            })
+        );
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn num_procs_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             numprocs=2",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                num_procs: 2,
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn num_procs_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             numprocs=badnumprocs",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn autostart_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             autostart=false",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                auto_start: false,
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn autostart_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             autostart=badvalue",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
         Ok(())
     }
 }

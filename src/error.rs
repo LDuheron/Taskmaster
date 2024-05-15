@@ -1,16 +1,22 @@
 pub type Result<T> = core::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     // -- parser
+    CantParseEntry {
+        entry_name: String,
+        e: String,
+    },
+    NoJobEntry,
     CantLoadFile(String),
     FieldNumProcsIsNotPositiveNumber {
         str: String,
     },
     FieldCommandIsEmpty,
     FieldCommandIsNotSet,
-    CantParseEntry {
-        entry_name: String,
+    CantParseField {
+        field_name: String,
+        value: String,
         type_name: String,
     },
     // -- to others errors
