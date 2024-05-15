@@ -112,6 +112,22 @@ impl Config {
         }
     }
 
+    fn _parse_autorestart(raw: &RawConfig) -> Result<AutorestartOptions> {
+        let field_name = String::from("autorestart");
+        match raw.get(&field_name) {
+            Some(Some(s)) if *s == String::from("always") => Ok(AutorestartOptions::Always),
+            Some(Some(s)) if *s == String::from("never") => Ok(AutorestartOptions::Never),
+            Some(Some(s)) if *s == String::from("unexpected") => {
+                Ok(AutorestartOptions::UnexpectedExit)
+            }
+            Some(Some(s)) => Err(Error::FieldBadFormat {
+                field_name,
+                msg: s.into(),
+            }),
+            _ => Ok(Job::default().auto_restart),
+        }
+    }
+
     fn _parse_autostart(raw: &RawConfig) -> Result<bool> {
         Self::_parse_raw_config_field::<bool>(
             raw,
@@ -121,11 +137,15 @@ impl Config {
     }
 
     fn _parse_command(raw: &RawConfig) -> Result<String> {
-        match raw.get("command") {
+        let field_name: String = String::from("command");
+        match raw.get(&field_name) {
             Some(Some(c)) => {
                 let command = c.clone();
                 if command.is_empty() {
-                    Err(Error::FieldCommandIsEmpty)
+                    Err(Error::FieldBadFormat {
+                        field_name,
+                        msg: "Field is empty".into(),
+                    })
                 } else {
                     Ok(command)
                 }
@@ -146,10 +166,12 @@ impl Config {
         let command: String = Self::_parse_command(&raw)?;
         let num_procs: u32 = Self::_parse_num_procs(&raw)?;
         let auto_start: bool = Self::_parse_autostart(&raw)?;
+        let auto_restart = Self::_parse_autorestart(&raw)?;
         Ok(Job {
             command,
             num_procs,
             auto_start,
+            auto_restart,
             ..Default::default()
         })
     }
@@ -296,7 +318,11 @@ mod tests {
             config.parse_content_of_parserconfig(config_parser),
             Err(Error::CantParseEntry {
                 entry_name: String::from("test"),
-                e: Error::FieldCommandIsEmpty.to_string(),
+                e: Error::FieldBadFormat {
+                    field_name: "command".into(),
+                    msg: "Field is empty".into()
+                }
+                .to_string(),
             })
         );
         assert!(config.map.is_empty());
@@ -387,6 +413,43 @@ mod tests {
             "[{job_name}]
              command={command}
              autostart=badvalue",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn autorestart_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             autorestart=always",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                auto_restart: AutorestartOptions::Always,
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn autorestart_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             autorestart=badvalue",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
