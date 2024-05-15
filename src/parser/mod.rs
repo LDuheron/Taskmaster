@@ -31,7 +31,7 @@ pub struct Job {
     num_procs: u32,
     auto_start: bool,
     auto_restart: AutorestartOptions,
-    expected_return_codes: Vec<u32>,
+    exit_codes: Vec<u32>,
     start_secs: u32,
     start_retries: u32,
     stop_signal: Vec<StopSignals>,
@@ -50,7 +50,7 @@ impl Default for Job {
             num_procs: 1,
             auto_start: true,
             auto_restart: AutorestartOptions::UnexpectedExit,
-            expected_return_codes: vec![1],
+            exit_codes: vec![1],
             start_secs: 1,
             start_retries: 3,
             stop_signal: vec![StopSignals::SIGTERM],
@@ -70,7 +70,7 @@ impl std::cmp::PartialEq for Job {
             && self.num_procs == other.num_procs
             && self.auto_start == other.auto_start
             && self.auto_restart == other.auto_restart
-            && self.expected_return_codes == other.expected_return_codes
+            && self.exit_codes == other.exit_codes
             && self.start_secs == other.start_secs
             && self.start_retries == other.start_retries
             && self.stop_signal == other.stop_signal
@@ -110,6 +110,19 @@ impl Config {
             })?),
             _ => Ok(default),
         }
+    }
+
+    fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<u32>> {
+        let field_name = String::from("exitcodes");
+        let raw_exitcodes = match raw.get(&field_name) {
+            Some(Some(str)) => {
+                println!("{str:#?}");
+                println!("{:#?}", str.split(", "));
+                Ok(Job::default().exit_codes)
+            }
+            _ => Ok(Job::default().exit_codes),
+        };
+        raw_exitcodes
     }
 
     fn _parse_autorestart(raw: &RawConfig) -> Result<AutorestartOptions> {
@@ -166,7 +179,8 @@ impl Config {
         let command: String = Self::_parse_command(&raw)?;
         let num_procs: u32 = Self::_parse_num_procs(&raw)?;
         let auto_start: bool = Self::_parse_autostart(&raw)?;
-        let auto_restart = Self::_parse_autorestart(&raw)?;
+        let auto_restart: AutorestartOptions = Self::_parse_autorestart(&raw)?;
+        let exit_codes: Vec<u32> = Self::_parse_exitcodes(&raw)?;
         Ok(Job {
             command,
             num_procs,
@@ -259,7 +273,7 @@ mod tests {
                 num_procs: 1,
                 auto_start: true,
                 auto_restart: AutorestartOptions::UnexpectedExit,
-                expected_return_codes: vec![1],
+                exit_codes: vec![1],
                 start_secs: 1,
                 start_retries: 3,
                 stop_signal: vec![StopSignals::SIGTERM],
@@ -292,7 +306,7 @@ mod tests {
                 num_procs: 1,
                 auto_start: true,
                 auto_restart: AutorestartOptions::UnexpectedExit,
-                expected_return_codes: vec![1],
+                exit_codes: vec![1],
                 start_secs: 1,
                 start_retries: 3,
                 stop_signal: vec![StopSignals::SIGTERM],
@@ -454,6 +468,28 @@ mod tests {
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn exitcodes_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             exitcodes=0, 2, 42",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                exit_codes: vec![0, 2, 42],
+                ..Default::default()
+            },
+        );
         Ok(())
     }
 }
