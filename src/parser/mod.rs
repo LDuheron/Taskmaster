@@ -16,13 +16,13 @@ pub enum AutorestartOptions {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub enum StopSignals {
-    SIGHUP = 1,
-    SIGINT = 2,
-    SIGQUIT = 3,
-    SIGKILL = 9,
-    SIGUSR1 = 10,
-    SIGUSR2 = 12,
-    SIGTERM = 15,
+    HUP = 1,
+    INT = 2,
+    QUIT = 3,
+    KILL = 9,
+    USR1 = 10,
+    USR2 = 12,
+    TERM = 15,
 }
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ pub struct Job {
     exit_codes: Vec<u8>,
     start_secs: u32,
     start_retries: u32,
-    stop_signal: Vec<StopSignals>,
+    stop_signal: StopSignals,
     stop_wait_secs: u32,
     stdin_file: Option<String>,
     stdout_file: Option<String>,
@@ -53,7 +53,7 @@ impl Default for Job {
             exit_codes: vec![1],
             start_secs: 1,
             start_retries: 3,
-            stop_signal: vec![StopSignals::SIGTERM],
+            stop_signal: StopSignals::TERM,
             stop_wait_secs: 10,
             stdin_file: None,
             stdout_file: None,
@@ -107,6 +107,24 @@ impl Config {
                 type_name: std::any::type_name::<T>().into(),
             })?),
             _ => Ok(default),
+        }
+    }
+
+    fn _parse_stop_signal(raw: &RawConfig) -> Result<StopSignals> {
+        let field_name = String::from("stopsignal");
+        match raw.get(&field_name) {
+            Some(Some(s)) if *s.to_lowercase() == String::from("hup") => Ok(StopSignals::HUP),
+            Some(Some(s)) if *s.to_lowercase() == String::from("int") => Ok(StopSignals::INT),
+            Some(Some(s)) if *s.to_lowercase() == String::from("quit") => Ok(StopSignals::QUIT),
+            Some(Some(s)) if *s.to_lowercase() == String::from("kill") => Ok(StopSignals::KILL),
+            Some(Some(s)) if *s.to_lowercase() == String::from("usr1") => Ok(StopSignals::USR1),
+            Some(Some(s)) if *s.to_lowercase() == String::from("usr2") => Ok(StopSignals::USR2),
+            Some(Some(s)) if *s.to_lowercase() == String::from("term") => Ok(StopSignals::TERM),
+            Some(Some(s)) => Err(Error::FieldBadFormat {
+                field_name,
+                msg: s.into(),
+            }),
+            _ => Ok(Job::default().stop_signal),
         }
     }
 
@@ -203,6 +221,7 @@ impl Config {
             exit_codes: Self::_parse_exitcodes(&raw)?,
             start_secs: Self::_parse_start_secs(&raw)?,
             start_retries: Self::_parse_start_retries(&raw)?,
+            stop_signal: Self::_parse_stop_signal(&raw)?,
             ..Default::default()
         })
     }
@@ -293,7 +312,7 @@ mod tests {
                 exit_codes: vec![1],
                 start_secs: 1,
                 start_retries: 3,
-                stop_signal: vec![StopSignals::SIGTERM],
+                stop_signal: StopSignals::TERM,
                 stop_wait_secs: 10,
                 stdin_file: None,
                 stdout_file: None,
@@ -326,7 +345,7 @@ mod tests {
                 exit_codes: vec![1],
                 start_secs: 1,
                 start_retries: 3,
-                stop_signal: vec![StopSignals::SIGTERM],
+                stop_signal: StopSignals::TERM,
                 stop_wait_secs: 10,
                 stdin_file: None,
                 stdout_file: None,
@@ -607,6 +626,43 @@ mod tests {
             "[{job_name}]
              command={command}
              startretries=bad",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn stop_signals_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stopsignal=INT",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                stop_signal: StopSignals::INT,
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stop_signal_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stopsignal=bad",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
