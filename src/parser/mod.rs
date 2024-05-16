@@ -110,6 +110,14 @@ impl Config {
         }
     }
 
+    fn _parse_stop_wait_seconds(raw: &RawConfig) -> Result<u32> {
+        Self::_parse_raw_config_field::<u32>(
+            raw,
+            String::from("stopwaitsecs"),
+            Job::default().stop_wait_secs,
+        )
+    }
+
     fn _parse_stop_signal(raw: &RawConfig) -> Result<StopSignals> {
         let field_name = String::from("stopsignal");
         match raw.get(&field_name) {
@@ -222,6 +230,7 @@ impl Config {
             start_secs: Self::_parse_start_secs(&raw)?,
             start_retries: Self::_parse_start_retries(&raw)?,
             stop_signal: Self::_parse_stop_signal(&raw)?,
+            stop_wait_secs: Self::_parse_stop_wait_seconds(&raw)?,
             ..Default::default()
         })
     }
@@ -663,6 +672,43 @@ mod tests {
             "[{job_name}]
              command={command}
              stopsignal=bad",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn stop_wait_secs_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stopwaitsecs=20",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                stop_wait_secs: 20,
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stop_wait_seconds_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stopwaitsecs=bad",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
