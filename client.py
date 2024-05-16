@@ -14,9 +14,12 @@ def read_char():
 	finally:
 		termios.tcsetattr(fd, termios.TCSADRAIN, old_tty_setting)
 
+
+# This function ensures the argument is not empty, neither multiple instructions.
 def check_arg(arg):
-	if len(arg) == 0 or arg.isspace():
-		print("Correct format is : [command] [program]\nType 'help' for all commands.\n")
+	print(arg)
+	if (len(arg) == 0 or (' ' in arg)):
+		print(FORMAT)
 		return False
 	else:
 		return True
@@ -29,7 +32,7 @@ class InputInterpretor(cmd.Cmd):
 		self.sock = sock
 
 	def	default(self, arg):
-		print("Correct format is : [command] [program]\nType 'help' for all commands.\n")
+		print(FORMAT)
 	
 	def do_start(self, arg):
 		'Start the program specified in the argument.\n'
@@ -66,6 +69,7 @@ class InputInterpretor(cmd.Cmd):
 
 HOST = '127.0.0.1'
 PORT = 4241
+FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.\n"
 
 if __name__ == "__main__":
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
