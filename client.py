@@ -14,23 +14,45 @@ def read_char():
 	finally:
 		termios.tcsetattr(fd, termios.TCSADRAIN, old_tty_setting)
 
+def is_empty(arg=None):
+	if is arg:
+		return "True"
+	else:
+		return "False"
+
 class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
 
+	def	__init__(self, sock):
+		super().__init__()
+		self.sock = sock
+
+	def	default(self, arg):
+		print("Correct format is : [command] [program]\nType 'help' for all commands.\n")
+	
 	def do_start(self, arg):
-		'start the arg'
-		# checker si l'arg corespond au config file
+		'Start the program specified in the argument.\n'
 		print("Start command :) ")
 	
 	def do_stop(self, arg):
+		'Stop the program specified in the argument.\n'
 		print("Stop command")
 
-	def do_restart(self, arg):
+	def do_restart(self, arg=None):
+		'Start the program specified in the argument.\n'
+		print(is_empty(arg))
 		print("Restart command")
 	
 	def do_quit(self, arg):
+		'Disconnect the client and quit the program.\n'
+		print('Client deconnexion')
+		sock.close()
 		return True
-	
+
+	def do_update(self, arg):
+		'Update the config file.\n'
+		print('updating the config file')
+
 	def	emptyline(self):
 		pass
 
@@ -39,5 +61,11 @@ class InputInterpretor(cmd.Cmd):
 			char = read_char()
 			self.cmdloop(char)
 
+HOST = '127.0.0.1'
+PORT = 4241
+
 if __name__ == "__main__":
-	InputInterpretor().cmdloop()
+	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	sock.connect((HOST, PORT))
+	print('Connected')
+	InputInterpretor(sock).cmdloop()
