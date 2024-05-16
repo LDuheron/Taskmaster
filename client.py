@@ -14,11 +14,12 @@ def read_char():
 	finally:
 		termios.tcsetattr(fd, termios.TCSADRAIN, old_tty_setting)
 
-def is_empty(arg=None):
-	if is arg:
-		return "True"
+def check_arg(arg):
+	if len(arg) == 0 or arg.isspace():
+		print("Correct format is : [command] [program]\nType 'help' for all commands.\n")
+		return False
 	else:
-		return "False"
+		return True
 
 class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
@@ -32,16 +33,18 @@ class InputInterpretor(cmd.Cmd):
 	
 	def do_start(self, arg):
 		'Start the program specified in the argument.\n'
-		print("Start command :) ")
+		if check_arg(arg):
+			print("Start command :) ")
 	
 	def do_stop(self, arg):
 		'Stop the program specified in the argument.\n'
-		print("Stop command")
+		if check_arg(arg):
+			print("Stop command")
 
 	def do_restart(self, arg=None):
 		'Start the program specified in the argument.\n'
-		print(is_empty(arg))
-		print("Restart command")
+		if check_arg(arg):
+			print("Restart command")
 	
 	def do_quit(self, arg):
 		'Disconnect the client and quit the program.\n'
