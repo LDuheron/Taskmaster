@@ -31,7 +31,7 @@ pub struct Job {
     num_procs: u32,
     auto_start: bool,
     auto_restart: AutorestartOptions,
-    exit_codes: Vec<u32>,
+    exit_codes: Vec<u8>,
     start_secs: u32,
     start_retries: u32,
     stop_signal: Vec<StopSignals>,
@@ -100,29 +100,33 @@ impl Config {
         field_name: String,
         default: T,
     ) -> Result<T> {
-        let type_name: String = std::any::type_name::<T>().into();
         // TODO: try to use unwrap or default
         match raw.get(&field_name) {
             Some(Some(value)) => Ok(value.parse::<T>().map_err(|_| Error::CantParseField {
                 field_name,
                 value: value.to_string(),
-                type_name,
+                type_name: std::any::type_name::<T>().into(),
             })?),
             _ => Ok(default),
         }
     }
 
-    fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<u32>> {
+    fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<u8>> {
         let field_name = String::from("exitcodes");
-        let raw_exitcodes = match raw.get(&field_name) {
-            Some(Some(str)) => {
-                println!("{str:#?}");
-                println!("{:#?}", str.split(", "));
-                Ok(Job::default().exit_codes)
-            }
+        match raw.get(&field_name) {
+            Some(Some(str)) => str
+                .split(",")
+                .map(str::trim)
+                .map(|s| {
+                    s.parse::<u8>().map_err(|_| Error::CantParseField {
+                        field_name: field_name.clone(),
+                        value: str.to_string(),
+                        type_name: std::any::type_name::<u8>().into(),
+                    })
+                })
+                .collect(),
             _ => Ok(Job::default().exit_codes),
-        };
-        raw_exitcodes
+        }
     }
 
     fn _parse_autorestart(raw: &RawConfig) -> Result<AutorestartOptions> {
@@ -180,12 +184,13 @@ impl Config {
         let num_procs: u32 = Self::_parse_num_procs(&raw)?;
         let auto_start: bool = Self::_parse_autostart(&raw)?;
         let auto_restart: AutorestartOptions = Self::_parse_autorestart(&raw)?;
-        let exit_codes: Vec<u32> = Self::_parse_exitcodes(&raw)?;
+        let exit_codes: Vec<u8> = Self::_parse_exitcodes(&raw)?;
         Ok(Job {
             command,
             num_procs,
             auto_start,
             auto_restart,
+            exit_codes,
             ..Default::default()
         })
     }
@@ -490,6 +495,36 @@ mod tests {
                 ..Default::default()
             },
         );
+        Ok(())
+    }
+
+    #[test]
+    fn exitcodes_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             exitcodes=1, 2, 5, asdf, 4",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn exitcodes_overflow() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             exitcodes=1, 2, 5, 256, 4",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
         Ok(())
     }
 }
