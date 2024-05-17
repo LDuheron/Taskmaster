@@ -36,7 +36,7 @@ pub struct Job {
     start_retries: u32,
     stop_signal: StopSignals,
     stop_wait_secs: u32,
-    stdin_file: Option<String>,
+    stderr_file: Option<String>,
     stdout_file: Option<String>,
     environment: HashMap<String, String>,
     work_dir: Option<String>,
@@ -55,7 +55,7 @@ impl Default for Job {
             start_retries: 3,
             stop_signal: StopSignals::TERM,
             stop_wait_secs: 10,
-            stdin_file: None,
+            stderr_file: None,
             stdout_file: None,
             environment: HashMap::new(),
             work_dir: None,
@@ -75,7 +75,7 @@ impl std::cmp::PartialEq for Job {
             && self.start_retries == other.start_retries
             && self.stop_signal == other.stop_signal
             && self.stop_wait_secs == other.stop_wait_secs
-            && self.stdin_file == other.stdin_file
+            && self.stderr_file == other.stderr_file
             && self.stdout_file == other.stdout_file
             && self.environment == other.environment
             && self.work_dir == other.work_dir
@@ -108,6 +108,46 @@ impl Config {
             })?),
             _ => Ok(default),
         }
+    }
+
+    fn _parse_file_field(
+        raw: &RawConfig,
+        field_name: String,
+        default: Option<String>,
+    ) -> Result<Option<String>> {
+        match raw.get(&field_name) {
+            Some(Some(str)) => {
+                if str.contains(char::is_whitespace) {
+                    Err(Error::FieldBadFormat {
+                        field_name,
+                        msg: "Field contain space".into(),
+                    })
+                } else {
+                    if str.is_empty() {
+                        Ok(default)
+                    } else {
+                        Ok(Some(str.clone()))
+                    }
+                }
+            }
+            _ => Ok(default),
+        }
+    }
+
+    fn _parse_stderr_file(raw: &RawConfig) -> Result<Option<String>> {
+        Ok(Self::_parse_file_field(
+            &raw,
+            "stderr_logfile".into(),
+            Job::default().stderr_file,
+        )?)
+    }
+
+    fn _parse_stdout_file(raw: &RawConfig) -> Result<Option<String>> {
+        Ok(Self::_parse_file_field(
+            &raw,
+            "stdout_logfile".into(),
+            Job::default().stderr_file,
+        )?)
     }
 
     fn _parse_stop_wait_seconds(raw: &RawConfig) -> Result<u32> {
@@ -195,20 +235,11 @@ impl Config {
     }
 
     fn _parse_command(raw: &RawConfig) -> Result<String> {
-        let field_name: String = String::from("command");
-        match raw.get(&field_name) {
-            Some(Some(c)) => {
-                let command = c.clone();
-                if command.is_empty() {
-                    Err(Error::FieldBadFormat {
-                        field_name,
-                        msg: "Field is empty".into(),
-                    })
-                } else {
-                    Ok(command)
-                }
-            }
-            _ => Err(Error::FieldCommandIsNotSet),
+        let file_name: Option<String> = Self::_parse_file_field(&raw, "command".into(), None)?;
+        if file_name.is_none() {
+            Err(Error::FieldCommandIsNotSet)
+        } else {
+            Ok(file_name.unwrap())
         }
     }
 
@@ -231,6 +262,11 @@ impl Config {
             start_retries: Self::_parse_start_retries(&raw)?,
             stop_signal: Self::_parse_stop_signal(&raw)?,
             stop_wait_secs: Self::_parse_stop_wait_seconds(&raw)?,
+            stderr_file: Self::_parse_stderr_file(&raw)?,
+            stdout_file: Self::_parse_stdout_file(&raw)?,
+            // environment: Self::_parse_environment(&raw)?,
+            // directory: Self::_parse_working_directory(&raw)?,
+            // umask: Self::_parse_umask(&raw)?,
             ..Default::default()
         })
     }
@@ -323,7 +359,7 @@ mod tests {
                 start_retries: 3,
                 stop_signal: StopSignals::TERM,
                 stop_wait_secs: 10,
-                stdin_file: None,
+                stderr_file: None,
                 stdout_file: None,
                 environment: HashMap::new(),
                 work_dir: None,
@@ -356,7 +392,7 @@ mod tests {
                 start_retries: 3,
                 stop_signal: StopSignals::TERM,
                 stop_wait_secs: 10,
-                stdin_file: None,
+                stderr_file: None,
                 stdout_file: None,
                 environment: HashMap::new(),
                 work_dir: None,
@@ -371,19 +407,10 @@ mod tests {
     fn empty_command() -> Result<()> {
         let (config_parser, mut config) = get_config_parser_and_config(String::from(
             "[test]
-             command:",
+             command=",
         ));
-        assert_eq!(
-            config.parse_content_of_parserconfig(config_parser),
-            Err(Error::CantParseEntry {
-                entry_name: String::from("test"),
-                e: Error::FieldBadFormat {
-                    field_name: "command".into(),
-                    msg: "Field is empty".into()
-                }
-                .to_string(),
-            })
-        );
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
     }
@@ -709,6 +736,102 @@ mod tests {
             "[{job_name}]
              command={command}
              stopwaitsecs=bad",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn stderr_file_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stderr_logfile=/dev/null",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                stderr_file: Some("/dev/null".to_string()),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stderr_file_empty() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stderr_logfile=",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                stderr_file: Job::default().stderr_file,
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stderr_file_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stderr_logfile=bad path",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn stdout_file_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stdout_logfile=/dev/null",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                stdout_file: Some("/dev/null".to_string()),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stdout_file_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             stdout_logfile=bad path",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
