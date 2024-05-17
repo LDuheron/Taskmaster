@@ -83,6 +83,6 @@ FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.
 
 if __name__ == "__main__":
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	sock.connect((HOST, PORT))
+	sock.connect((HOST, PORT)) # check if ca fail
 	print('Connected')
 	InputInterpretor(sock).cmdloop()
