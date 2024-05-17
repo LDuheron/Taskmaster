@@ -78,10 +78,11 @@ class InputInterpretor(cmd.Cmd):
 			self.cmdloop(char)
 
 HOST = '127.0.0.1'
-PORT = 2424
+PORT = 4241
 FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.\n"
 
 if __name__ == "__main__":
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	sock.connect((HOST, PORT))
 	print('Connected')
 	InputInterpretor(sock).cmdloop()
