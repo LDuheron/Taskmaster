@@ -38,7 +38,7 @@ pub struct Job {
     stop_wait_secs: u32,
     stderr_file: Option<String>,
     stdout_file: Option<String>,
-    environment: HashMap<String, String>,
+    environment: Option<HashMap<String, String>>,
     work_dir: Option<String>,
     umask: Option<String>,
 }
@@ -57,7 +57,7 @@ impl Default for Job {
             stop_wait_secs: 10,
             stderr_file: None,
             stdout_file: None,
-            environment: HashMap::new(),
+            environment: None,
             work_dir: None,
             umask: None,
         }
@@ -110,7 +110,7 @@ impl Config {
         }
     }
 
-    fn _parse_file_field(
+    fn _parse_one_word_field(
         raw: &RawConfig,
         field_name: String,
         default: Option<String>,
@@ -134,8 +134,39 @@ impl Config {
         }
     }
 
+    fn _parse_umask(raw: &RawConfig) -> Result<Option<String>> {
+        let field_name: String = String::from("umask");
+        let default: Option<String> = Job::default().umask;
+        let Some(umask) = Self::_parse_one_word_field(&raw, field_name.clone(), default.clone())?
+        else {
+            return Ok(None);
+        };
+        let is_valid_umask: bool =
+            umask.len() == 3 && umask.chars().all(|c| matches!(c, '0'..='8'));
+        if is_valid_umask {
+            Ok(Some(umask))
+        } else {
+            Err(Error::FieldBadFormat {
+                field_name,
+                msg: "Field contain too much characters".into(),
+            })
+        }
+    }
+
+    fn _parse_env(raw: &RawConfig) -> Result<Option<HashMap<String, String>>> {
+        todo!();
+    }
+
+    fn _parse_working_directory(raw: &RawConfig) -> Result<Option<String>> {
+        Ok(Self::_parse_one_word_field(
+            &raw,
+            "directory".into(),
+            Job::default().stderr_file,
+        )?)
+    }
+
     fn _parse_stderr_file(raw: &RawConfig) -> Result<Option<String>> {
-        Ok(Self::_parse_file_field(
+        Ok(Self::_parse_one_word_field(
             &raw,
             "stderr_logfile".into(),
             Job::default().stderr_file,
@@ -143,7 +174,7 @@ impl Config {
     }
 
     fn _parse_stdout_file(raw: &RawConfig) -> Result<Option<String>> {
-        Ok(Self::_parse_file_field(
+        Ok(Self::_parse_one_word_field(
             &raw,
             "stdout_logfile".into(),
             Job::default().stderr_file,
@@ -235,7 +266,7 @@ impl Config {
     }
 
     fn _parse_command(raw: &RawConfig) -> Result<String> {
-        let file_name: Option<String> = Self::_parse_file_field(&raw, "command".into(), None)?;
+        let file_name: Option<String> = Self::_parse_one_word_field(&raw, "command".into(), None)?;
         if file_name.is_none() {
             Err(Error::FieldCommandIsNotSet)
         } else {
@@ -265,8 +296,8 @@ impl Config {
             stderr_file: Self::_parse_stderr_file(&raw)?,
             stdout_file: Self::_parse_stdout_file(&raw)?,
             // environment: Self::_parse_environment(&raw)?,
-            // directory: Self::_parse_working_directory(&raw)?,
-            // umask: Self::_parse_umask(&raw)?,
+            work_dir: Self::_parse_working_directory(&raw)?,
+            umask: Self::_parse_umask(&raw)?,
             ..Default::default()
         })
     }
@@ -361,7 +392,7 @@ mod tests {
                 stop_wait_secs: 10,
                 stderr_file: None,
                 stdout_file: None,
-                environment: HashMap::new(),
+                environment: None,
                 work_dir: None,
                 umask: None,
             },
@@ -394,7 +425,7 @@ mod tests {
                 stop_wait_secs: 10,
                 stderr_file: None,
                 stdout_file: None,
-                environment: HashMap::new(),
+                environment: None,
                 work_dir: None,
                 umask: None,
             },
@@ -832,6 +863,110 @@ mod tests {
             "[{job_name}]
              command={command}
              stdout_logfile=bad path",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn working_directory_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             directory=/tmp",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                work_dir: Some("/tmp".to_string()),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn working_directory_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             directory=bad path",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn umask_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             umask=012",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                umask: Some("012".to_string()),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn umask_too_much_char() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             umask=01234",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn umask_bad_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             umask=abc",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn umask_value_too_big() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             umask=019",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
