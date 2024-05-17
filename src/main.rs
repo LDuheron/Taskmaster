@@ -17,7 +17,7 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
         let bytes_read = stream
             .read(&mut data)
             .map_err(|e| Error::Default(e.to_string()))?;
-        if (bytes_read == 0) {
+        if bytes_read == 0 {
             println!("Client is disconnected");
             break;
         }
@@ -33,10 +33,18 @@ fn init_server() -> Result<()> {
     });
 
     for stream in listener.incoming() {
-        let stream = stream.unwrap_or_else(|err| panic!("Connexion error")); // faire match
-        println!("New connection ");
-        handle_connection(stream)?;
-        println!("has skipped handle connection");
+		match stream {
+			Ok(stream) =>
+			{
+    			println!("New connection");
+        		handle_connection(stream);
+			},
+			Err(_) =>
+			{
+    			println!("Error during connection");
+			}
+		} {}
+        println!("Debug : has skipped handle connection");
     }
 
     Ok(())
