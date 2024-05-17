@@ -33,17 +33,16 @@ fn init_server() -> Result<()> {
     });
 
     for stream in listener.incoming() {
-		match stream {
-			Ok(stream) =>
-			{
-    			println!("New connection");
-        		handle_connection(stream);
-			},
-			Err(_) =>
-			{
-    			println!("Error during connection");
-			}
-		} {}
+        match stream {
+            Ok(stream) => {
+                println!("New connection");
+                handle_connection(stream);
+            }
+            Err(_) => {
+                println!("Error during connection");
+            }
+        }
+        {}
         println!("Debug : has skipped handle connection");
     }
 
