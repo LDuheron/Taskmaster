@@ -23,6 +23,13 @@ def check_arg(arg):
 	else:
 		return True
 
+# This function convert the string passed as argument to a bytes-like format,
+# then send it to the server.
+def	send_data(str, sock):
+	data = str
+	data_bytes = data.encode('utf-8')
+	sock.send(data_bytes)
+
 class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
 
@@ -36,19 +43,19 @@ class InputInterpretor(cmd.Cmd):
 	def do_start(self, arg):
 		'Start the program specified in the argument.\n'
 		if check_arg(arg):
-			sock.send(START)
+			send_data("start", sock)
 			print("Start command :) ")
 	
 	def do_stop(self, arg):
 		'Stop the program specified in the argument.\n'
 		if check_arg(arg):
-			sock.send(STOP)
+			send_data("stop", sock)
 			print("Stop command")
 
 	def do_restart(self, arg=None):
 		'Start the program specified in the argument.\n'
 		if check_arg(arg):
-			sock.send(RESTART)
+			send_data("restart", sock)
 			print("Restart command")
 	
 	def do_quit(self, arg):
@@ -59,6 +66,7 @@ class InputInterpretor(cmd.Cmd):
 
 	def do_update(self, arg):
 		'Update the config file.\n'
+		send_data("update", sock)
 		print('updating the config file')
 
 	def	emptyline(self):
@@ -70,14 +78,10 @@ class InputInterpretor(cmd.Cmd):
 			self.cmdloop(char)
 
 HOST = '127.0.0.1'
-PORT = 4241
+PORT = 2424
 FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.\n"
-START = bytes([0])
-STOP = bytes([1])
-RESTART = bytes([2])
 
 if __name__ == "__main__":
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	sock.connect((HOST, PORT))
 	print('Connected')
 	InputInterpretor(sock).cmdloop()
