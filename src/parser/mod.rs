@@ -153,8 +153,31 @@ impl Config {
         }
     }
 
-    fn _parse_env(raw: &RawConfig) -> Result<Option<HashMap<String, String>>> {
-        todo!();
+    fn _parse_environment(raw: &RawConfig) -> Result<Option<HashMap<String, String>>> {
+        let field_name: String = String::from("environment");
+        let default: Option<HashMap<String, String>> = Job::default().environment;
+        let Some(Some(raw_env)) = raw.get(&field_name) else {
+            return Ok(default);
+        };
+        let env_entry: Vec<&str> = raw_env.split(",").collect();
+        let mut map: HashMap<String, String> = HashMap::new();
+        for entry in env_entry {
+            let mut parts = entry.split("=");
+            let key = match parts.next() {
+                Some(k) => k.trim().to_string(),
+                _ => return Err(Error::CantParseEnvEntry(entry.to_string())),
+            };
+            let value = match parts.next() {
+                Some(v) => v.trim_matches('"').to_string(),
+                _ => return Err(Error::CantParseEnvEntry(entry.to_string())),
+            };
+            if parts.next() != None {
+                return Err(Error::CantParseEnvEntry(entry.to_string()));
+            }
+            map.insert(key, value);
+        }
+        println!("{map:#?}",);
+        Ok(Some(map))
     }
 
     fn _parse_working_directory(raw: &RawConfig) -> Result<Option<String>> {
@@ -190,7 +213,7 @@ impl Config {
     }
 
     fn _parse_stop_signal(raw: &RawConfig) -> Result<StopSignals> {
-        let field_name = String::from("stopsignal");
+        let field_name: String = String::from("stopsignal");
         match raw.get(&field_name) {
             Some(Some(s)) if *s.to_lowercase() == String::from("hup") => Ok(StopSignals::HUP),
             Some(Some(s)) if *s.to_lowercase() == String::from("int") => Ok(StopSignals::INT),
@@ -224,7 +247,7 @@ impl Config {
     }
 
     fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<u8>> {
-        let field_name = String::from("exitcodes");
+        let field_name: String = String::from("exitcodes");
         match raw.get(&field_name) {
             Some(Some(str)) => str
                 .split(",")
@@ -242,7 +265,7 @@ impl Config {
     }
 
     fn _parse_autorestart(raw: &RawConfig) -> Result<AutorestartOptions> {
-        let field_name = String::from("autorestart");
+        let field_name: String = String::from("autorestart");
         match raw.get(&field_name) {
             Some(Some(s)) if *s == String::from("always") => Ok(AutorestartOptions::Always),
             Some(Some(s)) if *s == String::from("never") => Ok(AutorestartOptions::Never),
@@ -295,7 +318,7 @@ impl Config {
             stop_wait_secs: Self::_parse_stop_wait_seconds(&raw)?,
             stderr_file: Self::_parse_stderr_file(&raw)?,
             stdout_file: Self::_parse_stdout_file(&raw)?,
-            // environment: Self::_parse_environment(&raw)?,
+            environment: Self::_parse_environment(&raw)?,
             work_dir: Self::_parse_working_directory(&raw)?,
             umask: Self::_parse_umask(&raw)?,
             ..Default::default()
@@ -304,8 +327,8 @@ impl Config {
 
     pub fn parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
         for entry in cfg {
-            let entry_name = entry.0.clone();
-            let job = match Self::_parse_job(&entry.1) {
+            let entry_name: String = entry.0.clone();
+            let job: Job = match Self::_parse_job(&entry.1) {
                 Err(e) => {
                     return Err(Error::CantParseEntry {
                         entry_name,
@@ -324,8 +347,8 @@ impl Config {
     }
 
     pub fn parse_config_file(&mut self, config_path: String) -> Result<()> {
-        let mut parser = Ini::new();
-        let cfg = parser.load(config_path).unwrap();
+        let mut parser: Ini = Ini::new();
+        let cfg: ConfigParserContent = parser.load(config_path).unwrap();
         Self::parse_content_of_parserconfig(self, cfg)?;
         println!("{:#?}", self);
         Ok(())
@@ -950,8 +973,7 @@ mod tests {
         let command: String = String::from("/bin/test");
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
-             command={command}
-             umask=abc",
+             command={command} umask=abc",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
@@ -971,6 +993,71 @@ mod tests {
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn environment_ok() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             environment=A=\"1\",B=\"2\"",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                environment: Some(HashMap::from([
+                    ("A".into(), "1".into()),
+                    ("B".into(), "2".into())
+                ])),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn environment_nothing_between_comma() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             environment=A=\"1\",,B=\"2\"",
+        ));
+        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
+        assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn environment_equal_between_double_quotes() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             environment=A=\"1\",B=\"2=5\"",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                environment: Some(HashMap::from([
+                    ("A".into(), "1".into()),
+                    ("B".into(), "2=5".into())
+                ])),
+                ..Default::default()
+            },
+        );
         Ok(())
     }
 }

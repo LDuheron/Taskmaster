@@ -19,6 +19,7 @@ pub enum Error {
         msg: String,
     },
     FieldCommandIsNotSet,
+    CantParseEnvEntry(String),
     // -- to others errors
     Default(String),
 }
