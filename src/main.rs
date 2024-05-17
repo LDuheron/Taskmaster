@@ -17,11 +17,10 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
         let bytes_read = stream
             .read(&mut data)
             .map_err(|e| Error::Default(e.to_string()))?;
-		if (bytes_read == 0)
-		{
-			println!("client is disconnected");
-			break;
-		}
+        if (bytes_read == 0) {
+            println!("Client is disconnected");
+            break;
+        }
         let formatted = String::from_utf8_lossy(&data[..bytes_read]);
         println!("Received: {}", formatted);
     }
@@ -49,36 +48,3 @@ fn main() -> Result<()> {
     init_server()?;
     Ok(())
 }
-
-// fn handle_connection(mut stream: TcpStream) {
-// 	println!("In handle connection");
-// 	let mut data = [0; 512];
-// 	match stream.read(&mut data) {
-// 		Ok(bytes_read)=> {
-// 		let formatted = String::from_utf8_lossy(&data[..bytes_read]);
-// 		println!("Received: {}", formatted);
-// 		},
-// 		Err(_) => {
-// 		println!("Error");
-// 		}
-// 	} {}
-// }
-
-// // // create socket, biend, listen, accept
-// // // proteger le bind qui peut fail
-// fn init_server() {
-//     let listener = TcpListener::bind("127.0.0.1:4241").unwrap();
-
-// 	println!("test");
-// 	// loop
-// 	// {
-// 	for stream in listener.incoming() {
-// 		println!("test 2");
-// 		let stream = stream.unwrap();
-// 		println!("New connection ");
-// 		handle_connection(stream);
-// 		println!("has skipped handle connection");
-// 	}
-// 	// }
-// 	// Ok(())
-// }
