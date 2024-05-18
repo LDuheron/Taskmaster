@@ -20,8 +20,6 @@ pub enum Error {
     },
     FieldCommandIsNotSet,
     CantParseEnvEntry(String),
-    // -- to others errors
-    Default(String),
 }
 
 impl core::fmt::Display for Error {
@@ -29,5 +27,3 @@ impl core::fmt::Display for Error {
         write!(fmt, "{self:?}")
     }
 }
-
-impl std::error::Error for Error {}
