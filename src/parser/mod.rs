@@ -87,7 +87,7 @@ impl std::cmp::PartialEq for Job {
 
 #[derive(Debug)]
 pub struct Config {
-    pub map: HashMap<String, Job>,
+    map: HashMap<String, Job>,
 }
 
 impl Config {
@@ -100,6 +100,10 @@ impl Config {
         Config {
             map: HashMap::new(),
         }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Job)> {
+        self.map.iter()
     }
 
     pub fn parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
@@ -125,8 +129,11 @@ impl Config {
 
     pub fn parse_config_file(&mut self, config_path: String) -> Result<()> {
         let mut parser: Ini = Ini::new();
-        let cfg: ConfigParserContent = parser.load(config_path).unwrap();
+        let cfg: ConfigParserContent = parser
+            .load(config_path)
+            .map_err(|e| Error::CantLoadFile(e.to_string()))?;
         Self::parse_content_of_parserconfig(self, cfg)?;
+        // TODO: run program with autostart true
         Ok(())
     }
 
