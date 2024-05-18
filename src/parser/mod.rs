@@ -162,21 +162,16 @@ impl Config {
         let env_entry: Vec<&str> = raw_env.split(",").collect();
         let mut map: HashMap<String, String> = HashMap::new();
         for entry in env_entry {
-            let mut parts = entry.split("=");
-            let key = match parts.next() {
-                Some(k) => k.trim().to_string(),
-                _ => return Err(Error::CantParseEnvEntry(entry.to_string())),
-            };
-            let value = match parts.next() {
-                Some(v) => v.trim_matches('"').to_string(),
-                _ => return Err(Error::CantParseEnvEntry(entry.to_string())),
-            };
-            if parts.next() != None {
+            let Some(pos_first_equal) = entry.find("=") else {
                 return Err(Error::CantParseEnvEntry(entry.to_string()));
+            };
+            let key = entry[..pos_first_equal].to_string();
+            let mut value: &str = &entry[pos_first_equal + 1..];
+            if value.starts_with('"') && value.ends_with('"') {
+                value = &value[1..value.len() - 1];
             }
-            map.insert(key, value);
+            map.insert(key.to_string(), value.to_string());
         }
-        println!("{map:#?}",);
         Ok(Some(map))
     }
 
@@ -350,7 +345,6 @@ impl Config {
         let mut parser: Ini = Ini::new();
         let cfg: ConfigParserContent = parser.load(config_path).unwrap();
         Self::parse_content_of_parserconfig(self, cfg)?;
-        println!("{:#?}", self);
         Ok(())
     }
 }
@@ -1054,6 +1048,31 @@ mod tests {
                 environment: Some(HashMap::from([
                     ("A".into(), "1".into()),
                     ("B".into(), "2=5".into())
+                ])),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn environment_quote_in_value() -> Result<()> {
+        let job_name: String = String::from("test");
+        let command: String = String::from("/bin/test");
+        let (config_parser, mut config) = get_config_parser_and_config(format!(
+            "[{job_name}]
+             command={command}
+             environment=A=\"1\",B=\"\"\"",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get(&job_name).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command,
+                environment: Some(HashMap::from([
+                    ("A".into(), "1".into()),
+                    ("B".into(), "\"".into())
                 ])),
                 ..Default::default()
             },
