@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AutorestartOptions {
     Always,
     Never,
@@ -9,7 +9,7 @@ pub enum AutorestartOptions {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StopSignals {
     HUP = 1,
     INT = 2,
@@ -20,7 +20,7 @@ pub enum StopSignals {
     TERM = 15,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Job {
     pub command: String,
     pub num_procs: u32,
@@ -75,5 +75,19 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
+    }
+}
+
+impl Job {
+    pub fn start(self: &Self, job_name: &String) {
+        println!("start {}", job_name);
+    }
+
+    pub fn restart(self: &Self, job_name: &String) {
+        println!("restart {}", job_name);
+    }
+
+    pub fn stop(self: &Self, job_name: &String) {
+        println!("stop {}", job_name);
     }
 }

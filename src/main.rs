@@ -18,23 +18,23 @@ extern "C" fn handle_sighup(_signum: i32) {
 }
 
 fn main() -> Result<()> {
+    unsafe {
+        // TODO: change to sighup
+        signal(3, handle_sighup as usize);
+    }
     if std::env::args().len() != 2 {
         return Err(Error::BadNumberOfArguments(String::from(
             "usage: taskmaster config_file",
         )));
     }
     let config_file: String = std::env::args().nth(1).unwrap();
-    unsafe {
-        signal(SIGHUP, handle_sighup as usize);
-    }
     let mut config: Config = Config::new();
-    config.parse_config_file(config_file)?;
+    config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
     loop {
         unsafe {
             if RELOAD_CONFIG {
-                println!("RELOAD_CONFIG");
-                // config.reload_config(config_file);
+                config.reload_config(&config_file)?;
                 RELOAD_CONFIG = false;
             }
         }

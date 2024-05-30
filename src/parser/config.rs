@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub type ConfigParserContent = HashMap<String, HashMap<String, Option<String>>>;
 pub type RawConfig = HashMap<String, Option<String>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
     map: HashMap<String, Job>,
 }
@@ -23,9 +23,12 @@ impl Config {
         }
     }
 
-    #[allow(dead_code)]
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Job)> {
         self.map.iter()
+    }
+
+    pub fn get(&self, field_name: &String) -> Option<&Job> {
+        self.map.get(field_name)
     }
 
     pub fn parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
@@ -49,13 +52,27 @@ impl Config {
         Ok(())
     }
 
-    pub fn parse_config_file(&mut self, config_path: String) -> Result<()> {
+    pub fn parse_config_file(&mut self, config_path: &String) -> Result<()> {
         let mut parser: Ini = Ini::new();
         let cfg: ConfigParserContent = parser
             .load(config_path)
             .map_err(|e| Error::CantLoadFile(e.to_string()))?;
         Self::parse_content_of_parserconfig(self, cfg)?;
         // TODO: run program with autostart true
+        Ok(())
+    }
+
+    pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
+        println!("log: reload config");
+        let old_config: Config = self.clone();
+        Self::parse_config_file(self, config_path)?;
+        for entry in self.iter() {
+            let job_name: String = entry.0.into();
+            let job: &Job = entry.1;
+            if Some(job) != old_config.get(&job_name) {
+                job.restart(&job_name);
+            }
+        }
         Ok(())
     }
 
