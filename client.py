@@ -1,6 +1,13 @@
 import cmd
 import sys, tty, termios
 import socket
+import signal
+
+def	sigintHandler(sig, frame):
+	print("\rCtrl-c was pressed. Exiting server.\n")
+	sys.exit(0)
+
+signal.signal(signal.SIGINT, sigintHandler)
 
 # This function allows reading stdin in raw mode (meaning, without expecting the '\n' to transmit the data)
 # only one character per character
@@ -78,7 +85,7 @@ class InputInterpretor(cmd.Cmd):
 			self.cmdloop(char)
 
 HOST = '127.0.0.1'
-PORT = 4241
+PORT = 4243
 FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.\n"
 
 if __name__ == "__main__":
@@ -86,3 +93,4 @@ if __name__ == "__main__":
 	sock.connect((HOST, PORT)) # check if ca fail
 	print('Connected')
 	InputInterpretor(sock).cmdloop()
+

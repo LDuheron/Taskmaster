@@ -4,6 +4,10 @@ mod parser;
 // https://doc.rust-lang.org/std/net/struct.TcpListener.html
 // https://doc.rust-lang.org/book/ch20-01-single-threaded.html
 
+// Erreurs : si le server exit, le client continue d'envoyer des messages
+// Gerer le controle c cote serveur
+// gerer plusieurs clients -> bloquer les autres
+
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
 
@@ -28,22 +32,22 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
 }
 
 fn init_server() -> Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:4241").unwrap_or_else(|err| {
+    let listener = TcpListener::bind("127.0.0.1:4243").unwrap_or_else(|err| {
         panic!("Failed to bind");
     });
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                println!("New connection");
-                handle_connection(stream);
+                println!("Info : New connection");
+                let _= handle_connection(stream);
             }
             Err(_) => {
                 println!("Error during connection");
             }
         }
         {}
-        println!("Debug : has skipped handle connection");
+        println!("Info : Client disconnected");
     }
 
     Ok(())
