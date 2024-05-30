@@ -1,0 +1,15 @@
+termios = ce qui permet de changer les parametres de l'I/O
+
+termios.setattr => set les parametres du terminal pour le fd donne + determine les attributs modifies ->
+TCSANOW les attributs sont modifies now, flush -> a la fin, drain -> les donnees en attente detre envoyees sont bien transmises avant que les modifications des attributs du terminal ne soient effectuees
+
+The tty module defines functions for putting the tty into cbreak and raw modes.
+
+tty.setraw -> passe le terminal en mode raw (!= canonical qui prend linput user jusauq recevoir le \n) puis renvoie dans termios.set automatiquement
+
+server ecoute
+client ecrit
+
+
+server -> create socket, bind, listen, accept // receive
+client -> socket, connect, // send

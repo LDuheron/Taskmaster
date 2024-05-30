@@ -11,3 +11,4 @@ daemon -> programme en arriere plan
 
 
 Avoir deux "programmes" ? un pour le daemon et un pour linterface de communication 
+

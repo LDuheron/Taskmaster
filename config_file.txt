@@ -1,8 +1,0 @@
-Contenu d'un config file 
-=> specifier les details e chaque programme a superviser
-
-- nom du programme
-- path vers le programme
-- option de demarrage : autostart="true"
-- option de redemarrage : autorestart="true"
-- stdout
