@@ -40,7 +40,7 @@ fn init_server() -> Result<()> {
         match stream {
             Ok(stream) => {
                 println!("Info : New connection");
-                let _= handle_connection(stream);
+                let _ = handle_connection(stream);
             }
             Err(_) => {
                 println!("Error during connection");

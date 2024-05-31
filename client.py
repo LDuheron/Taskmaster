@@ -3,11 +3,11 @@ import sys, tty, termios
 import socket
 import signal
 
-def	sigintHandler(sig, frame):
+def	sigint_handler(sig, frame):
 	print("\rCtrl-c was pressed. Exiting server.\n")
 	sys.exit(0)
 
-signal.signal(signal.SIGINT, sigintHandler)
+signal.signal(signal.SIGINT, sigint_handler)
 
 # This function allows reading stdin in raw mode (meaning, without expecting the '\n' to transmit the data)
 # only one character per character
@@ -33,9 +33,21 @@ def check_arg(arg):
 # This function convert the string passed as argument to a bytes-like format,
 # then send it to the server.
 def	send_data(str, sock):
+	server_is_healthy(sock)
 	data = str
 	data_bytes = data.encode('utf-8')
 	sock.send(data_bytes)
+
+# This function attempts to create a simple connexion with the server to ensure it is still running.
+def server_is_healthy(sock):
+	try:
+		print("before up!")
+		sock.create_connection((HOST, PORT), all_errors=False)
+		sock.sendall()
+		print("is up!")
+	except:
+		print("is down")
+		
 
 class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
@@ -89,8 +101,11 @@ PORT = 4243
 FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.\n"
 
 if __name__ == "__main__":
-	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	sock.connect((HOST, PORT)) # check if ca fail
-	print('Connected')
-	InputInterpretor(sock).cmdloop()
+	try:
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # noter code erreur.
+		sock.connect((HOST, PORT)) # check if ca fail try -> TimeoutError ou InterrruptedError.
+		print('Connected')
+		InputInterpretor(sock).cmdloop()
+	except (TimeoutError, InterruptedError):
+		print('Error: client cannot connect to port')
 
