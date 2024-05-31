@@ -104,14 +104,13 @@ impl Config {
             .load(config_path)
             .map_err(|e| Error::CantLoadFile(e.to_string()))?;
         self.parse_content_of_parserconfig(cfg)?;
-		for entry in self.map.iter_mut() {
-			let job_name: &String = entry.0;
-			let job: &mut Job = entry.1;
-			if job.auto_start {	
-				entry.1.start(entry.0);
-			}
-		}
-        // TODO: run program with autostart true
+        for entry in self.map.iter_mut() {
+            let job_name: &String = entry.0;
+            let job: &mut Job = entry.1;
+            if job.auto_start {
+                job.start(job_name);
+            }
+        }
         Ok(())
     }
 
