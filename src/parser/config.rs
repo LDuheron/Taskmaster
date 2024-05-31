@@ -401,6 +401,7 @@ mod tests {
                 environment: None,
                 work_dir: None,
                 umask: None,
+                ..Default::default()
             },
         );
         assert_eq!(config.map.len(), 1);
@@ -434,6 +435,7 @@ mod tests {
                 environment: None,
                 work_dir: None,
                 umask: None,
+                ..Default::default()
             },
         );
         assert_eq!(config.map.len(), 1);
@@ -485,6 +487,7 @@ mod tests {
                 ])),
                 work_dir: Some("/tmp".into()),
                 umask: Some("022".into()),
+                ..Default::default()
             },
         );
         job = config.map.get("cat".into()).unwrap();
