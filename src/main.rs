@@ -71,27 +71,27 @@ extern "C" fn handle_sighup(_signum: i32) {
 
 fn main() -> Result<()> {
     unsafe {
-        // TODO: change to sighup
-        signal(3, handle_sighup as usize);
+        signal(SIGHUP, handle_sighup as usize);
     }
     if std::env::args().len() != 2 {
         return Err(Error::BadNumberOfArguments(String::from(
             "usage: taskmaster config_file",
         )));
     }
+	init_server()?;
     let config_file: String = std::env::args().nth(1).unwrap();
     // let mut config: Config = Config::new();
     // config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
+    let duration = std::time::Duration::from_millis(500);
     loop {
         unsafe {
             if RELOAD_CONFIG {
                 config.reload_config(&config_file)?;
-    init_server()?;
+                println!("{:#?}", config);
                 RELOAD_CONFIG = false;
             }
         }
-        let duration = std::time::Duration::from_millis(500);
         std::thread::sleep(duration);
     }
     // Ok(())

@@ -31,6 +31,52 @@ impl Config {
         self.map.get(field_name)
     }
 
+    pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
+        let mut old_config: Config = self.clone();
+        self.map.clear();
+        let parsing_result = Self::parse_config_file(self, config_path);
+        if parsing_result.is_err() {
+            println!(
+                "log: cant reload the config: {:?}",
+                parsing_result.unwrap_err()
+            );
+            self.map = old_config.map;
+            return Ok(());
+        }
+        println!("log: reload config with {}", config_path);
+        for entry in self.map.iter_mut() {
+            let job_name: String = entry.0.into();
+            let job: &mut Job = entry.1;
+            let old_job: &mut Job = match old_config.map.get_mut(&job_name) {
+                Some(j) => j,
+                // new job case
+                _ => {
+                    if job.auto_start {
+                        job.start(&job_name);
+                    }
+                    continue;
+                }
+            };
+            // job is changed case
+            if job != old_job {
+                if old_job.is_running {
+                    old_job.stop(&job_name);
+                    job.start(&job_name);
+                } else if job.auto_start {
+                    job.start(&job_name);
+                }
+            }
+            old_config.map.remove_entry(&job_name);
+        }
+        // job is not present in new config file
+        for entry in old_config.map.iter_mut() {
+            let old_job_name: String = entry.0.into();
+            let old_job: &mut Job = entry.1;
+            old_job.stop(&old_job_name);
+        }
+        Ok(())
+    }
+
     pub fn parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
         for entry in cfg {
             let entry_name: String = entry.0.clone();
@@ -59,20 +105,6 @@ impl Config {
             .map_err(|e| Error::CantLoadFile(e.to_string()))?;
         Self::parse_content_of_parserconfig(self, cfg)?;
         // TODO: run program with autostart true
-        Ok(())
-    }
-
-    pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
-        println!("log: reload config");
-        let old_config: Config = self.clone();
-        Self::parse_config_file(self, config_path)?;
-        for entry in self.iter() {
-            let job_name: String = entry.0.into();
-            let job: &Job = entry.1;
-            if Some(job) != old_config.get(&job_name) {
-                job.restart(&job_name);
-            }
-        }
         Ok(())
     }
 
@@ -163,7 +195,7 @@ impl Config {
     fn _parse_working_directory(raw: &RawConfig) -> Result<Option<String>> {
         Ok(Self::_parse_one_word_field(
             &raw,
-            "directory".into(),
+            "workdir".into(),
             Job::default().stderr_file,
         )?)
     }
@@ -171,7 +203,7 @@ impl Config {
     fn _parse_stderr_file(raw: &RawConfig) -> Result<Option<String>> {
         Ok(Self::_parse_one_word_field(
             &raw,
-            "stderr_logfile".into(),
+            "stderr".into(),
             Job::default().stderr_file,
         )?)
     }
@@ -179,7 +211,7 @@ impl Config {
     fn _parse_stdout_file(raw: &RawConfig) -> Result<Option<String>> {
         Ok(Self::_parse_one_word_field(
             &raw,
-            "stdout_logfile".into(),
+            "stdout".into(),
             Job::default().stderr_file,
         )?)
     }
@@ -369,6 +401,7 @@ mod tests {
                 environment: None,
                 work_dir: None,
                 umask: None,
+                ..Default::default()
             },
         );
         assert_eq!(config.map.len(), 1);
@@ -402,6 +435,7 @@ mod tests {
                 environment: None,
                 work_dir: None,
                 umask: None,
+                ..Default::default()
             },
         );
         assert_eq!(config.map.len(), 1);
@@ -424,10 +458,10 @@ mod tests {
         startretries=5
         stopsignal=INT
         stopwaitsecs=20
-        stderr_logfile=/path/stderr
-        stdout_logfile=/path/stdout
+        stderr=/path/stderr
+        stdout=/path/stdout
         environment=FIRSTNAME=\"John\",LASTNAME=\"Doe\"
-        directory=/tmp
+        workdir=/tmp
         umask=022
 ",
         ));
@@ -453,6 +487,7 @@ mod tests {
                 ])),
                 work_dir: Some("/tmp".into()),
                 umask: Some("022".into()),
+                ..Default::default()
             },
         );
         job = config.map.get("cat".into()).unwrap();
@@ -814,7 +849,7 @@ mod tests {
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
              command={command}
-             stderr_logfile=/dev/null",
+             stderr=/dev/null",
         ));
         config.parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
@@ -836,7 +871,7 @@ mod tests {
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
              command={command}
-             stderr_logfile=",
+             stderr=",
         ));
         config.parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
@@ -858,7 +893,7 @@ mod tests {
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
              command={command}
-             stderr_logfile=bad path",
+             stderr=bad path",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
@@ -873,7 +908,7 @@ mod tests {
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
              command={command}
-             stdout_logfile=/dev/null",
+             stdout=/dev/null",
         ));
         config.parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
@@ -895,7 +930,7 @@ mod tests {
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
              command={command}
-             stdout_logfile=bad path",
+             stdout=bad path",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
@@ -910,7 +945,7 @@ mod tests {
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
              command={command}
-             directory=/tmp",
+             workdir=/tmp",
         ));
         config.parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
@@ -932,7 +967,7 @@ mod tests {
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
              command={command}
-             directory=bad path",
+             workdir=bad path",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
