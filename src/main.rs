@@ -31,14 +31,15 @@ fn main() -> Result<()> {
     let mut config: Config = Config::new();
     config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
+    let duration = std::time::Duration::from_millis(500);
     loop {
         unsafe {
             if RELOAD_CONFIG {
                 config.reload_config(&config_file)?;
+                println!("{:#?}", config);
                 RELOAD_CONFIG = false;
             }
         }
-        let duration = std::time::Duration::from_millis(500);
         std::thread::sleep(duration);
     }
     // Ok(())

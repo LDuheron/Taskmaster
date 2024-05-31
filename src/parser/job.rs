@@ -36,6 +36,7 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
+    pub is_running: bool,
 }
 
 impl Default for Job {
@@ -55,10 +56,12 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
+            is_running: false,
         }
     }
 }
 
+// !!! is_running is not check
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
@@ -79,15 +82,19 @@ impl std::cmp::PartialEq for Job {
 }
 
 impl Job {
-    pub fn start(self: &Self, job_name: &String) {
-        println!("start {}", job_name);
+    pub fn start(self: &mut Self, job_name: &String) {
+        println!("log: start {}", job_name);
+        self.is_running = true;
     }
 
-    pub fn restart(self: &Self, job_name: &String) {
-        println!("restart {}", job_name);
+    pub fn restart(self: &mut Self, job_name: &String) {
+        println!("log: restart {}", job_name);
+        self.stop(job_name);
+        self.start(job_name);
     }
 
-    pub fn stop(self: &Self, job_name: &String) {
-        println!("stop {}", job_name);
+    pub fn stop(self: &mut Self, job_name: &String) {
+        println!("log: stop {}", job_name);
+        self.is_running = true;
     }
 }
