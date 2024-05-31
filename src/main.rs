@@ -19,8 +19,7 @@ extern "C" fn handle_sighup(_signum: i32) {
 
 fn main() -> Result<()> {
     unsafe {
-        // TODO: change to sighup
-        signal(3, handle_sighup as usize);
+        signal(SIGHUP, handle_sighup as usize);
     }
     if std::env::args().len() != 2 {
         return Err(Error::BadNumberOfArguments(String::from(
