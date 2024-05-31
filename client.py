@@ -33,21 +33,15 @@ def check_arg(arg):
 # This function convert the string passed as argument to a bytes-like format,
 # then send it to the server.
 def	send_data(str, sock):
-	server_is_healthy(sock)
-	data = str
-	data_bytes = data.encode('utf-8')
-	sock.send(data_bytes)
-
-# This function attempts to create a simple connexion with the server to ensure it is still running.
-def server_is_healthy(sock):
 	try:
-		print("before up!")
-		sock.create_connection((HOST, PORT), all_errors=False)
-		sock.sendall()
-		print("is up!")
-	except:
-		print("is down")
-		
+		data = str
+		data_bytes = data.encode('utf-8')
+		sock.send(data_bytes)
+	except Exception as e:
+		print("Error:", e)
+		print('Client deconnexion')
+		sock.close()
+		exit(0)
 
 class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
@@ -95,6 +89,7 @@ class InputInterpretor(cmd.Cmd):
 		while (42):
 			char = read_char()
 			self.cmdloop(char)
+	
 
 HOST = '127.0.0.1'
 PORT = 4243

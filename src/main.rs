@@ -26,6 +26,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
             break;
         }
         let formatted = String::from_utf8_lossy(&data[..bytes_read]);
+		if (formatted == "PING") {
+			println!("received a ping");
+		}
         println!("Received: {}", formatted);
     }
     Ok(())
