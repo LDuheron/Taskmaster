@@ -1,20 +1,26 @@
 pub type Result<T> = core::result::Result<T, Error>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
+    BadNumberOfArguments(String),
     // -- parser
     CantLoadFile(String),
-    FieldNumProcsIsNotPositiveNumber {
-        str: String,
-    },
-    FieldCommandIsEmpty,
-    FieldCommandIsNotSet,
+    NoJobEntry,
     CantParseEntry {
         entry_name: String,
+        e: String,
+    },
+    CantParseField {
+        field_name: String,
+        value: String,
         type_name: String,
     },
-    // -- to others errors
-    Default(String),
+    FieldBadFormat {
+        field_name: String,
+        msg: String,
+    },
+    FieldCommandIsNotSet,
+    CantParseEnvEntry(String),
 }
 
 impl core::fmt::Display for Error {
@@ -22,5 +28,3 @@ impl core::fmt::Display for Error {
         write!(fmt, "{self:?}")
     }
 }
-
-impl std::error::Error for Error {}
