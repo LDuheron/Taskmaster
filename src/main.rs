@@ -7,11 +7,9 @@ mod parser;
 // Erreurs : si le server exit, le client continue d'envoyer des messages
 // Gerer le controle c cote serveur
 // gerer plusieurs clients -> bloquer les autres
-
+use error::{Error, Result};
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
-
-use error::{Error, Result};
 use parser::config::Config;
 
 fn handle_connection(mut stream: TcpStream) -> Result<()> {
@@ -26,9 +24,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
             break;
         }
         let formatted = String::from_utf8_lossy(&data[..bytes_read]);
-		if (formatted == "PING") {
-			println!("received a ping");
-		}
+		// if (formatted == "PING") {
+		// 	println!("received a ping");
+		// }
         println!("Received: {}", formatted);
     }
     Ok(())
@@ -36,9 +34,8 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
 
 fn init_server() -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:4243").unwrap_or_else(|err| {
-        panic!("Failed to bind");
+        panic!("Failed to bind"); ///// TODO: remove panic
     });
-
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
@@ -78,11 +75,11 @@ fn main() -> Result<()> {
             "usage: taskmaster config_file",
         )));
     }
-	init_server()?;
     let config_file: String = std::env::args().nth(1).unwrap();
-    // let mut config: Config = Config::new();
-    // config.parse_config_file(&config_file)?;
+	let mut config: Config = Config::new();
+    config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
+	init_server()?;
     let duration = std::time::Duration::from_millis(500);
     loop {
         unsafe {
