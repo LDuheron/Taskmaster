@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AutorestartOptions {
     Always,
     Never,
@@ -9,7 +9,7 @@ pub enum AutorestartOptions {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StopSignals {
     HUP = 1,
     INT = 2,
@@ -20,7 +20,7 @@ pub enum StopSignals {
     TERM = 15,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Job {
     pub command: String,
     pub num_procs: u32,
@@ -36,6 +36,7 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
+    pub is_running: bool,
 }
 
 impl Default for Job {
@@ -55,10 +56,12 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
+            is_running: false,
         }
     }
 }
 
+// !!! is_running is not check
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
@@ -75,5 +78,23 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
+    }
+}
+
+impl Job {
+    pub fn start(self: &mut Self, job_name: &String) {
+        println!("log: start {}", job_name);
+        self.is_running = true;
+    }
+
+    pub fn restart(self: &mut Self, job_name: &String) {
+        println!("log: restart {}", job_name);
+        self.stop(job_name);
+        self.start(job_name);
+    }
+
+    pub fn stop(self: &mut Self, job_name: &String) {
+        println!("log: stop {}", job_name);
+        self.is_running = true;
     }
 }
