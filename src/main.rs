@@ -30,10 +30,18 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-fn main() -> Result<()> {
-    unsafe {
-        signal(SIGHUP, handle_sighup as usize);
+fn init_connection(ip: String, port: String) -> Result<Option<std::net::TcpListener>> {
+    let listener = std::net::TcpListener::bind(format!("{ip}:{port}"))
+        .map_err(|err| Error::Default(err.to_string()))?;
+    if listener.set_nonblocking(true).is_err() {
+        println!("Can't set non blocking listener...");
+        return Ok(None);
     }
+    println!("bind ok");
+    Ok(Some(listener))
+}
+
+fn main() -> Result<()> {
     if std::env::args().len() != 2 {
         return Err(Error::BadNumberOfArguments(String::from(
             "usage: taskmaster config_file",
@@ -43,15 +51,15 @@ fn main() -> Result<()> {
     let mut config: Config = Config::new();
     config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
+    unsafe {
+        signal(SIGHUP, handle_sighup as usize);
+    }
     let duration = std::time::Duration::from_millis(500);
     loop {
-        let listener = std::net::TcpListener::bind("127.0.0.1:4241")
-            .map_err(|err| Error::Default(err.to_string()))?;
-        if listener.set_nonblocking(true).is_err() {
-            println!("Can't set non blocking listener...");
-            continue;
-        }
-        println!("bind ok");
+        let listener = match init_connection("127.0.0.1".into(), "4241".into())? {
+            Some(l) => l,
+            None => continue,
+        };
         loop {
             try_reload_config(&mut config, &config_file);
             for stream in listener.incoming() {
@@ -66,7 +74,9 @@ fn main() -> Result<()> {
                             try_reload_config(&mut config, &config_file);
                             match s.read(&mut data) {
                                 Ok(bytes) if bytes != 0 => {
-                                    println!("read: {}", String::from_utf8_lossy(&data[..bytes]))
+                                    println!("read: {}", String::from_utf8_lossy(&data[..bytes]));
+                                    drop(s);
+                                    break;
                                 }
                                 Ok(bytes) if bytes == 0 => {
                                     println!("client disconnected");
