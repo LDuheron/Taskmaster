@@ -18,42 +18,16 @@ extern "C" fn handle_sighup(_signum: i32) {
     }
 }
 
-fn init_server() -> Result<()> {
-    let listener = std::net::TcpListener::bind("127.0.0.1:4241")
-        .map_err(|err| Error::Default(err.to_string()))?;
-
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                println!("New connection");
-                handle_connection(stream)?;
+fn try_reload_config(config: &mut Config, config_file: &String) {
+    unsafe {
+        if RELOAD_CONFIG {
+            match config.reload_config(&config_file) {
+                Err(e) => println!("log: can't reload file: {e}"),
+                Ok(()) => println!("config file is reloaded: \n{:#?}", config),
             }
-            Err(_) => {
-                println!("Error during connection");
-            }
+            RELOAD_CONFIG = false;
         }
-        {}
-        println!("Debug : has skipped handle connection");
     }
-
-    Ok(())
-}
-
-fn handle_connection(mut stream: std::net::TcpStream) -> Result<()> {
-    println!("In handle connection");
-    loop {
-        let mut data = [0; 512];
-        let bytes_read = stream
-            .read(&mut data)
-            .map_err(|e| Error::Default(e.to_string()))?;
-        if bytes_read == 0 {
-            println!("Client is disconnected");
-            break;
-        }
-        let formatted = String::from_utf8_lossy(&data[..bytes_read]);
-        println!("Received: {}", formatted);
-    }
-    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -69,19 +43,46 @@ fn main() -> Result<()> {
     let mut config: Config = Config::new();
     config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
-    init_server()?;
     let duration = std::time::Duration::from_millis(500);
     loop {
-        unsafe {
-            if RELOAD_CONFIG {
-                config.reload_config(&config_file)?;
-                println!("{:#?}", config);
-                RELOAD_CONFIG = false;
-            }
+        let listener = std::net::TcpListener::bind("127.0.0.1:4241")
+            .map_err(|err| Error::Default(err.to_string()))?;
+        if listener.set_nonblocking(true).is_err() {
+            println!("Can't set non blocking listener...");
+            continue;
         }
-        std::thread::sleep(duration);
+        println!("bind ok");
+        loop {
+            try_reload_config(&mut config, &config_file);
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(mut s) => {
+                        let mut data = [0; 128];
+                        if s.set_nonblocking(true).is_err() {
+                            println!("Can't set non blocking stream...");
+                            continue;
+                        }
+                        loop {
+                            try_reload_config(&mut config, &config_file);
+                            match s.read(&mut data) {
+                                Ok(bytes) if bytes != 0 => {
+                                    println!("read: {}", String::from_utf8_lossy(&data[..bytes]))
+                                }
+                                Ok(bytes) if bytes == 0 => {
+                                    println!("client disconnected");
+                                    break;
+                                }
+                                _ => std::thread::sleep(duration),
+                            }
+                        }
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        break;
+                    }
+                    Err(e) => return Err(Error::Default(format!("encountered IO error: {e}"))),
+                }
+            }
+            std::thread::sleep(duration);
+        }
     }
-    // Ok(())
 }
-// https://doc.rust-lang.org/std/net/struct.TcpListener.html
-// https://doc.rust-lang.org/book/ch20-01-single-threaded.html
