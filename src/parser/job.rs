@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::process::{Command, Stdio, Child};
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
@@ -20,6 +21,13 @@ pub enum StopSignals {
     TERM = 15,
 }
 
+// pub struct Child {
+//     pub stdin: Option<ChildStdin>,
+//     pub stdout: Option<ChildStdout>,
+//     pub stderr: Option<ChildStderr>,
+//     // some fields omitted
+// }
+
 #[derive(Debug, Clone)]
 pub struct Job {
     pub command: String,
@@ -37,6 +45,7 @@ pub struct Job {
     pub work_dir: Option<String>,
     pub umask: Option<String>,
     pub is_running: bool,
+    pub process: vec<Child>, // pour store les process
 }
 
 impl Default for Job {
@@ -57,6 +66,7 @@ impl Default for Job {
             work_dir: None,
             umask: None,
             is_running: false,
+			process: None //////////// 
         }
     }
 }
@@ -82,9 +92,28 @@ impl std::cmp::PartialEq for Job {
 }
 
 impl Job {
-    pub fn start(self: &mut Self, job_name: &String) {
+    pub fn start(self: &mut Self, job_name: &String) -> Result<()> {
         println!("log: start {}", job_name);
-        self.is_running = true;
+
+        // Checker si le process CIBLE is running
+        // To do : trouver un moyen de cibler le process. Iterer sur les process ?
+        if !(self.process.is_none()) {
+            print!("Process is not running.");
+            Ok(())
+        }
+
+        let child = Command::new(self.command); // Process builder
+
+        // Changer la config du process
+        // .arg() // ajouter les arguments des process
+
+        // Executes the process
+        child.spawn().try_wait().expect("Command failed to start");
+
+        child.self.process.push(child); // ranger le process dans le vecteur process de job
+		let output = output.stdout;
+
+		self.is_running = true;
     }
 
     pub fn restart(self: &mut Self, job_name: &String) {
@@ -95,6 +124,8 @@ impl Job {
 
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
-        self.is_running = true;
+        // checker si le process run
+        self.process.kill().expect("Failed to kill the process");
+        self.is_running = false; // Passer a false ?
     }
 }
