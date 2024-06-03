@@ -21,6 +21,7 @@ pub enum Error {
     },
     FieldCommandIsNotSet,
     CantParseEnvEntry(String),
+    Default(String),
 }
 
 impl core::fmt::Display for Error {
