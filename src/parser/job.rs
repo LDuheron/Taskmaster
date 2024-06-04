@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::process::{Command, Stdio, Child};
+use std::process::{Child, Command, Stdio};
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
@@ -45,7 +45,7 @@ pub struct Job {
     pub work_dir: Option<String>,
     pub umask: Option<String>,
     pub is_running: bool,
-    pub process: vec<Child>, // pour store les process
+    // pub process: vec<Child>, // pour store les process
 }
 
 impl Default for Job {
@@ -66,7 +66,7 @@ impl Default for Job {
             work_dir: None,
             umask: None,
             is_running: false,
-			process: None //////////// 
+            // process: None, ////////////
         }
     }
 }
@@ -92,28 +92,31 @@ impl std::cmp::PartialEq for Job {
 }
 
 impl Job {
-    pub fn start(self: &mut Self, job_name: &String) -> Result<()> {
+    pub fn start(self: &mut Self, job_name: &String) {
         println!("log: start {}", job_name);
 
         // Checker si le process CIBLE is running
         // To do : trouver un moyen de cibler le process. Iterer sur les process ?
-        if !(self.process.is_none()) {
-            print!("Process is not running.");
-            Ok(())
-        }
+        // if !(self.process.is_none()) {
+        //     print!("Process is not running.");
 
-        let child = Command::new(self.command); // Process builder
+        // }
 
-        // Changer la config du process
-        // .arg() // ajouter les arguments des process
+        let mut child = Command::new(self.command)
+            .stderr(self.stderr_file) // configure the child process's standard error handle
+            .stdout(self.stdout_file)
+            .spawn()
+            .expect("start failed");
+        // configure the child process's standard output handle
 
-        // Executes the process
-        child.spawn().try_wait().expect("Command failed to start");
+        let status = child.wait().unwrap();
+        // waiting for process to finish
 
-        child.self.process.push(child); // ranger le process dans le vecteur process de job
-		let output = output.stdout;
+        println!("status : {}", status);
+        // self.process.push(child); // ranger le process dans le vecteur process de job
+        // // let output = output.stdout;
 
-		self.is_running = true;
+        self.is_running = true;
     }
 
     pub fn restart(self: &mut Self, job_name: &String) {
@@ -125,7 +128,7 @@ impl Job {
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
         // checker si le process run
-        self.process.kill().expect("Failed to kill the process");
+        // self.process.kill().expect("Failed to kill the process");
         self.is_running = false; // Passer a false ?
     }
 }
