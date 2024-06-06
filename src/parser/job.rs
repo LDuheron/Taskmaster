@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::process::{Child, Command, Stdio};
+use std::process::Command; //, Stdio
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
@@ -21,13 +21,6 @@ pub enum StopSignals {
     TERM = 15,
 }
 
-// pub struct Child {
-//     pub stdin: Option<ChildStdin>,
-//     pub stdout: Option<ChildStdout>,
-//     pub stderr: Option<ChildStderr>,
-//     // some fields omitted
-// }
-
 #[derive(Debug, Clone)]
 pub struct Job {
     pub command: String,
@@ -45,7 +38,7 @@ pub struct Job {
     pub work_dir: Option<String>,
     pub umask: Option<String>,
     pub is_running: bool,
-    // pub process: vec<Child>, // pour store les process
+    pub processes: Option<Vec<u32>>, // store les process
 }
 
 impl Default for Job {
@@ -66,7 +59,7 @@ impl Default for Job {
             work_dir: None,
             umask: None,
             is_running: false,
-            // process: None, ////////////
+            processes: None
         }
     }
 }
@@ -88,6 +81,7 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
+			// && self.processes: Vec::new() ///
     }
 }
 
@@ -102,18 +96,17 @@ impl Job {
 
         // }
 
-        let mut child = Command::new(self.command)
-            .stderr(self.stderr_file) // configure the child process's standard error handle
-            .stdout(self.stdout_file)
-            .spawn()
+        let mut command = Command::new(self.command.clone());
+            // .stderr(self.stderr_file) // configure the child process's standard error handle
+            // .stdout(self.stdout_file)
+        let mut child_process = command.spawn()
             .expect("start failed");
-        // configure the child process's standard output handle
 
-        let status = child.wait().unwrap();
+        let status = child_process.wait().unwrap();
         // waiting for process to finish
 
         println!("status : {}", status);
-        // self.process.push(child); // ranger le process dans le vecteur process de job
+        self.processes.clone().expect("Should push the new process in vector").push(child_process.id()); // ranger le process dans le vecteur process de job
         // // let output = output.stdout;
 
         self.is_running = true;
