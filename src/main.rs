@@ -54,45 +54,31 @@ fn main() -> Result<()> {
     unsafe {
         signal(SIGHUP, handle_sighup as usize);
     }
-    let duration = std::time::Duration::from_millis(500);
-    loop {
-        let listener = match init_connection("127.0.0.1".into(), "4241".into())? {
-            Some(l) => l,
-            None => continue,
-        };
-        loop {
-            try_reload_config(&mut config, &config_file);
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(mut s) => {
-                        let mut data = [0; 128];
-                        if s.set_nonblocking(true).is_err() {
-                            println!("Can't set non blocking stream...");
-                            continue;
-                        }
-                        loop {
-                            try_reload_config(&mut config, &config_file);
-                            match s.read(&mut data) {
-                                Ok(bytes) if bytes != 0 => {
-                                    println!("read: {}", String::from_utf8_lossy(&data[..bytes]));
-                                    drop(s);
-                                    break;
-                                }
-                                Ok(bytes) if bytes == 0 => {
-                                    println!("client disconnected");
-                                    break;
-                                }
-                                _ => std::thread::sleep(duration),
-                            }
-                        }
+    let duration = std::time::Duration::from_millis(100);
+    let listener = match init_connection("127.0.0.1".into(), "4241".into())? {
+        Some(l) => l,
+        None => todo!(),
+    };
+    for stream in listener.incoming() {
+        try_reload_config(&mut config, &config_file);
+        match stream {
+            Ok(mut s) => {
+                let mut str = String::new();
+                match s.read_to_string(&mut str) {
+                    Ok(bytes) if bytes != 0 => {
+                        println!("read: {}", str);
                     }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        break;
+                    Ok(bytes) if bytes == 0 => {
+                        println!("client disconnected");
                     }
-                    Err(e) => return Err(Error::Default(format!("encountered IO error: {e}"))),
+                    _ => std::thread::sleep(duration),
                 }
             }
-            std::thread::sleep(duration);
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(duration)
+            }
+            Err(e) => return Err(Error::Default(format!("encountered IO error: {e}"))),
         }
     }
+    Ok(())
 }
