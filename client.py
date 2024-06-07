@@ -9,6 +9,8 @@ import os
 HOST = 'localhost'
 PORT = 4241
 
+# This function allows reading stdin in raw mode (meaning, without expecting the '\n' to transmit the data)
+# only one character per character
 def read_char():
 	fd = sys.stdin.fileno()
 	old_tty_setting = termios.tcgetattr(fd)
@@ -63,6 +65,9 @@ class InputInterpretor(cmd.Cmd):
 		"""Reload the config file"""
 		os.system("pkill -hup taskmaster")
 		print("taskmaster config file is reloaded")
+
+	def emptyline(self):
+		pass
 
 	def cmd_loop(self):
 		while (42):
