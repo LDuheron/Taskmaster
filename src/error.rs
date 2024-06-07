@@ -2,8 +2,8 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    BadNumberOfArguments(String),
     // -- parser
+    BadNumberOfArguments(String),
     CantLoadFile(String),
     NoJobEntry,
     CantParseEntry {
@@ -21,6 +21,7 @@ pub enum Error {
     },
     FieldCommandIsNotSet,
     CantParseEnvEntry(String),
+    IO(String),
     Default(String),
 }
 

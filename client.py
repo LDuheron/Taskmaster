@@ -3,6 +3,7 @@ import sys, tty, termios
 import socket
 import signal
 import sys
+import os
 
 
 HOST = 'localhost'
@@ -21,11 +22,11 @@ def	send_data(str):
 	try:
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		sock.connect((HOST, PORT))
-		print('Connected')
 		sock.send(str.encode('utf-8'))
+		print(sock.recv(128))
 		sock.close()
 	except Exception as e:
-		print("Error in send_data:", e)
+		print("Error when sending data:", e)
 
 class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
@@ -34,37 +35,34 @@ class InputInterpretor(cmd.Cmd):
 		super().__init__()
 
 	def	default(self, line):
-		print( "Correct format is : [command] [program]\nType 'help' for all commands.")
+		print(f"{line} is invalid...")
+		print("Correct format is: [command] [program]")
+		print("Type 'help' for all commands.")
 	
 	def do_status(self, arg):
-		'Print the status of all the programs\n'
+		"""Print the status of all the programs"""
 		send_data(f"status {arg}")
-		print("Start command :) ")
 
 	def do_start(self, arg):
-		'Start the program specified in argument.\n'
+		"""Start the program specified in argument"""
 		send_data(f"start {arg}")
-		print("Start command :) ")
 	
 	def do_stop(self, arg):
-		'Stop the program specified in argument.\n'
+		"""Stop the program specified in argument"""
 		send_data(f"stop {arg}")
-		print("Stop command")
 
 	def do_restart(self, arg=None):
-		'Restart the program specified in argument.\n'
+		"""Restart the program specified in argument"""
 		send_data(f"restart {arg}")
-		print("Restart command")
 	
 	def do_quit(self, arg):
-		'Disconnect the client and quit program.\n'
-		print('Client disconnected')
+		"""Disconnect the client and quit program"""
 		sys.exit(0)
 
 	def do_reload(self, arg):
-		'Reload the config file.\n'
-		send_data("reload")
-		print('Reloading the config file')
+		"""Reload the config file"""
+		os.system("pkill -hup taskmaster")
+		print("taskmaster config file is reloaded")
 
 	def cmd_loop(self):
 		while (42):

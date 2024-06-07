@@ -37,18 +37,25 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
         try_reload_config(config, config_file);
         match stream {
             Ok(mut s) => {
-                let mut str = String::new();
-                match s.read_to_string(&mut str) {
-                    Ok(bytes) if bytes != 0 => {
-                        println!("read: {}", str);
-                    }
-                    _ => std::thread::sleep(duration),
+                let mut data: [u8; 128] = [0; 128];
+                let bytes_read: usize = s
+                    .read(&mut data)
+                    .map_err(|e| Error::Default(e.to_string()))?;
+                if bytes_read == 0 {
+                    std::thread::sleep(duration);
+                    continue;
                 }
+                let formatted = String::from_utf8_lossy(&data[..bytes_read]);
+                println!("read: {}", formatted);
+                // do something with the message from the client
+                // and return a message
+                // is it a fatal error ?
+                s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(duration)
             }
-            Err(e) => return Err(Error::Default(format!("encountered IO error: {e}"))),
+            Err(e) => return Err(Error::IO(e.to_string())),
         }
     }
     Ok(())
