@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::fs;
+use std::fs::{File, OpenOptions};
+use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
@@ -114,26 +115,86 @@ impl Job {
         println!("log: start {}", job_name);
 
         if self.is_running == true {
-            println!("Process is already running.");
+            println!("Process is already running."); // eprint ?
             return;
         }
 
+        // checker le comportement si il est deja run dans la doc
+
         let mut command = Command::new(&self.command);
 
+        if let Some(ref config_umask) = self.umask {
+            match command.pre_exec(|| {
+                unsafe { libc::umask(config_umask) }; // checker si c'est le bon input
+            }) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                    return;
+                }
+            }
+        }
+
+        if let Some(ref work_dir) = self.work_dir {
+            match command.current_dir(work_dir) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                    return;
+                }
+            }
+        }
+
         // checker si ca vaut none aussi dans ce cas on change rien
-        // if let Some(ref stderr_file) = self.stderr_file {
-        //     match open(self.stderr_file) {
-        //         Ok(mut file) => {
-        //             println!("Success")
+        if let Some(ref stderr_file) = self.stderr_file {
+            match OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(stderr_file)
+            {
+                Ok(file) => {
+                    command.stderr(Stdio::from(file));
+                }
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                    // = PermissionDenied
+                    return;
+                }
+            }
+        }
+
+        if let Some(ref stdout_file) = self.stdout_file {
+            match OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(stdout_file)
+            {
+                Ok(file) => {
+                    command.stdout(Stdio::from(file));
+                }
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                    // = PermissionDenied
+                    return;
+                }
+            }
+        }
+
+        // if let Some(ref arguments) = self.arguments {
+        //     match OpenOptions::new().write(true).create(true).open(arguments) {
+        //         Ok(file) => {
+        // 			command.args(arguments);
         //         }
         //         Err(e) => {
         //             eprintln!("Error: {:?}", e);
         //             return;
-        //             // erreur possible = existe pas donc je le cree
-        //             // permission denied jsp quoi faire}
         //         }
         //     }
         // }
+
+        // workdir
+        // environment
+        // modifier le is running check
 
         match command.spawn() {
             Ok(child_process) => {
@@ -155,14 +216,12 @@ impl Job {
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
         // if self.is_running == true {
-        //     match self.processes.kill() {
+        //     match self.processes.kill() { // preciser quel child je kill
         //         Ok(_) => self.is_running = false,
-        //         Err(e) => println!("Error: {:?}", e),
+        //         Err(e) => println!("Error: {:?}", e)
         //     }
         // } else {
         //     println!("Process is not running");
         // }
-    }
+    } // stop signal
 }
-
-// Virer tous les expects car ce son en realite des panic
