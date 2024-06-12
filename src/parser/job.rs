@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::os::unix::process::CommandExt;
-use std::path::Path;
+use std::fs;
+use std::fs::OpenOptions;
 use std::process::{Child, Command, Stdio};
 
 #[allow(dead_code)]
@@ -40,8 +39,7 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
-    pub is_running: bool,
-    pub processes: Vec<Child>,
+    pub processes: HashMap<u32, Child>,
 }
 
 impl Default for Job {
@@ -61,8 +59,7 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
-            is_running: false,
-            processes: Vec::new(),
+            processes: HashMap::new(),
         }
     }
 }
@@ -85,8 +82,7 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
-            is_running: self.is_running,
-            processes: Vec::new(),
+            processes: HashMap::new(),
         }
     }
 }
@@ -114,95 +110,99 @@ impl Job {
     pub fn start(self: &mut Self, job_name: &String) {
         println!("log: start {}", job_name);
 
-        if self.is_running == true {
-            println!("Process is already running."); // eprint ?
-            return;
-        }
+        for i in 0..self.num_procs {
+            let mut command = Command::new(&self.command);
 
-        // checker le comportement si il est deja run dans la doc
+            if let Some(child) = self.processes.get_mut(&i) {
+                match child.try_wait() {
+                    Ok(None) => {
+                        println!("Process is already running."); // eprint ?
+                        continue; // checker le comportement si il est deja run dans la doc
+                    }
+                    Ok(Some(_)) => {}
+                    Err(e) => {
+                        eprintln!("Error: {:?}", e);
+                        return;
+                    }
+                }
+            }
 
-        let mut command = Command::new(&self.command);
+            // if let Some(ref config_umask) = self.umask {
+            //     match command.pre_exec( || {
+            //         unsafe { libc::umask(config_umask) }; // checker si c'est le bon input
+            //     }) {
+            //         Ok(_) => {}
+            //         Err(e) => {
+            //             eprintln!("Error: {:?}", e);
+            //             return;
+            //         }
+            //     }
+            // }
 
-        if let Some(ref config_umask) = self.umask {
-            match command.pre_exec(|| {
-                unsafe { libc::umask(config_umask) }; // checker si c'est le bon input
-            }) {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("Error: {:?}", e);
+            if let Some(ref work_dir) = self.work_dir {
+                if fs::metadata(work_dir).is_err() {
+                    eprintln!("Error: {:?}", work_dir);
                     return;
                 }
+                command.current_dir(work_dir);
             }
-        }
 
-        if let Some(ref work_dir) = self.work_dir {
-            match command.current_dir(work_dir) {
-                Ok(_) => {}
+            // checker si ca vaut none aussi dans ce cas on change rien
+            if let Some(ref stderr_file) = self.stderr_file {
+                match OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(stderr_file)
+                {
+                    Ok(file) => {
+                        command.stderr(Stdio::from(file));
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {:?}", e);
+                        // = PermissionDenied
+                        return;
+                    }
+                }
+            }
+
+            if let Some(ref stdout_file) = self.stdout_file {
+                match OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(stdout_file)
+                {
+                    Ok(file) => {
+                        command.stdout(Stdio::from(file));
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {:?}", e);
+                        // = PermissionDenied
+                        return;
+                    }
+                }
+            }
+
+            // if let Some(ref arguments) = self.arguments {
+            //     match OpenOptions::new().write(true).create(true).open(arguments) {
+            //         Ok(file) => {
+            // 			command.args(arguments);
+            //         }
+            //         Err(e) => {
+            //             eprintln!("Error: {:?}", e);
+            //             return;
+            //         }
+            //     }
+            // }
+
+            // environment
+
+            match command.spawn() {
+                Ok(child_process) => {
+                    self.processes.insert(i, child_process);
+                }
                 Err(e) => {
-                    eprintln!("Error: {:?}", e);
-                    return;
+                    eprintln!("Failed to start process: {:?}", e);
                 }
-            }
-        }
-
-        // checker si ca vaut none aussi dans ce cas on change rien
-        if let Some(ref stderr_file) = self.stderr_file {
-            match OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open(stderr_file)
-            {
-                Ok(file) => {
-                    command.stderr(Stdio::from(file));
-                }
-                Err(e) => {
-                    eprintln!("Error: {:?}", e);
-                    // = PermissionDenied
-                    return;
-                }
-            }
-        }
-
-        if let Some(ref stdout_file) = self.stdout_file {
-            match OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open(stdout_file)
-            {
-                Ok(file) => {
-                    command.stdout(Stdio::from(file));
-                }
-                Err(e) => {
-                    eprintln!("Error: {:?}", e);
-                    // = PermissionDenied
-                    return;
-                }
-            }
-        }
-
-        // if let Some(ref arguments) = self.arguments {
-        //     match OpenOptions::new().write(true).create(true).open(arguments) {
-        //         Ok(file) => {
-        // 			command.args(arguments);
-        //         }
-        //         Err(e) => {
-        //             eprintln!("Error: {:?}", e);
-        //             return;
-        //         }
-        //     }
-        // }
-
-        // workdir
-        // environment
-        // modifier le is running check
-
-        match command.spawn() {
-            Ok(child_process) => {
-                self.processes.push(child_process);
-                self.is_running = true;
-            }
-            Err(e) => {
-                eprintln!("Failed to start process: {:?}", e);
             }
         }
     }
@@ -217,7 +217,6 @@ impl Job {
         println!("log: stop {}", job_name);
         // if self.is_running == true {
         //     match self.processes.kill() { // preciser quel child je kill
-        //         Ok(_) => self.is_running = false,
         //         Err(e) => println!("Error: {:?}", e)
         //     }
         // } else {
