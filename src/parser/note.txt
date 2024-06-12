@@ -1,0 +1,27 @@
+        // umask pre exec
+     
+	 
+	   // creer une variable pour l'erreur
+        // essayer douvrir le fichier
+        // if je peux pas l'ouvrir je le cree
+
+    //   if let Some(stdout_file) = &self.stdout_file {
+    //         command.stdout(Stdio::from(self.stdout_file.clone().as_ref().unwrap()));
+    //     }
+
+    //     if self.stderr_file.is_some() {
+    //         command.stderr(self.stderr_file.unwrap());
+    //     } // configure the child process's standard error handle
+        // virer les expect par ce que ca panic
+
+
+1. checker si le process run deja
+2. creer le process
+3. changer la sortie out et la err si besoin
+= essayer douvrir le fichier
+- si le fichier ne souvre pas car permissions -> erreur
+- si le fichier n'existe pas -> le creer
+- si le fichier souvre -> modifier les sorties
+4. spawn le process
+5. passer is running a true
+6. ranger le process dans un vecteur

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use std::process::Command; //, Stdio
+use std::fs;
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
@@ -21,7 +23,7 @@ pub enum StopSignals {
     TERM = 15,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Job {
     pub command: String,
     pub num_procs: u32,
@@ -38,7 +40,7 @@ pub struct Job {
     pub work_dir: Option<String>,
     pub umask: Option<String>,
     pub is_running: bool,
-    pub processes: Option<Vec<u32>>, // store les process
+    pub processes: Vec<Child>,
 }
 
 impl Default for Job {
@@ -59,12 +61,35 @@ impl Default for Job {
             work_dir: None,
             umask: None,
             is_running: false,
-            processes: None
+            processes: Vec::new(),
         }
     }
 }
 
-// !!! is_running is not check
+// clone() seulement sur les types non primitifs donc deep copy
+impl Clone for Job {
+    fn clone(&self) -> Job {
+        Job {
+            command: self.command.clone(),
+            num_procs: self.num_procs,
+            auto_start: self.auto_start,
+            auto_restart: self.auto_restart.clone(),
+            exit_codes: self.exit_codes.clone(),
+            start_secs: self.start_secs,
+            start_retries: self.start_retries,
+            stop_signal: self.stop_signal.clone(),
+            stop_wait_secs: self.stop_wait_secs,
+            stderr_file: self.stderr_file.clone(),
+            stdout_file: self.stdout_file.clone(),
+            environment: self.environment.clone(),
+            work_dir: self.work_dir.clone(),
+            umask: self.umask.clone(),
+            is_running: self.is_running,
+            processes: Vec::new(),
+        }
+    }
+}
+
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
@@ -81,7 +106,6 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
-			// && self.processes: Vec::new() ///
     }
 }
 
@@ -89,27 +113,37 @@ impl Job {
     pub fn start(self: &mut Self, job_name: &String) {
         println!("log: start {}", job_name);
 
-        // Checker si le process CIBLE is running
-        // To do : trouver un moyen de cibler le process. Iterer sur les process ?
-        // if !(self.process.is_none()) {
-        //     print!("Process is not running.");
+        if self.is_running == true {
+            println!("Process is already running.");
+            return;
+        }
 
+        let mut command = Command::new(&self.command);
+
+        // checker si ca vaut none aussi dans ce cas on change rien
+        // if let Some(ref stderr_file) = self.stderr_file {
+        //     match open(self.stderr_file) {
+        //         Ok(mut file) => {
+        //             println!("Success")
+        //         }
+        //         Err(e) => {
+        //             eprintln!("Error: {:?}", e);
+        //             return;
+        //             // erreur possible = existe pas donc je le cree
+        //             // permission denied jsp quoi faire}
+        //         }
+        //     }
         // }
 
-        let mut command = Command::new(self.command.clone());
-            // .stderr(self.stderr_file) // configure the child process's standard error handle
-            // .stdout(self.stdout_file)
-        let mut child_process = command.spawn()
-            .expect("start failed");
-
-        let status = child_process.wait().unwrap();
-        // waiting for process to finish
-
-        println!("status : {}", status);
-        self.processes.clone().expect("Should push the new process in vector").push(child_process.id()); // ranger le process dans le vecteur process de job
-        // // let output = output.stdout;
-
-        self.is_running = true;
+        match command.spawn() {
+            Ok(child_process) => {
+                self.processes.push(child_process);
+                self.is_running = true;
+            }
+            Err(e) => {
+                eprintln!("Failed to start process: {:?}", e);
+            }
+        }
     }
 
     pub fn restart(self: &mut Self, job_name: &String) {
@@ -120,8 +154,15 @@ impl Job {
 
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
-        // checker si le process run
-        // self.process.kill().expect("Failed to kill the process");
-        self.is_running = false; // Passer a false ?
+        // if self.is_running == true {
+        //     match self.processes.kill() {
+        //         Ok(_) => self.is_running = false,
+        //         Err(e) => println!("Error: {:?}", e),
+        //     }
+        // } else {
+        //     println!("Process is not running");
+        // }
     }
 }
+
+// Virer tous les expects car ce son en realite des panic

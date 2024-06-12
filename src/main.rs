@@ -8,9 +8,9 @@ mod parser;
 // Gerer le controle c cote serveur
 // gerer plusieurs clients -> bloquer les autres
 use error::{Error, Result};
+use parser::config::Config;
 use std::io::prelude::*;
 use std::net::{TcpListener, TcpStream};
-use parser::config::Config;
 
 fn handle_connection(mut stream: TcpStream) -> Result<()> {
     println!("In handle connection");
@@ -24,9 +24,9 @@ fn handle_connection(mut stream: TcpStream) -> Result<()> {
             break;
         }
         let formatted = String::from_utf8_lossy(&data[..bytes_read]);
-		// if (formatted == "PING") {
-		// 	println!("received a ping");
-		// }
+        // if (formatted == "PING") {
+        // 	println!("received a ping");
+        // }
         println!("Received: {}", formatted);
     }
     Ok(())
@@ -76,10 +76,10 @@ fn main() -> Result<()> {
         )));
     }
     let config_file: String = std::env::args().nth(1).unwrap();
-	let mut config: Config = Config::new();
+    let mut config: Config = Config::new();
     config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
-	init_server()?;
+    init_server()?;
     let duration = std::time::Duration::from_millis(500);
     loop {
         unsafe {
