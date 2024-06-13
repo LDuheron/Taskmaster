@@ -116,14 +116,20 @@ impl Job {
             if let Some(child) = self.processes.get_mut(&i) {
                 match child.try_wait() {
                     Ok(None) => {
-                        println!("Process is already running."); // eprint ?
-                        continue; // checker le comportement si il est deja run dans la doc
+                        println!("Process is already running.");
+                        continue;
                     }
                     Ok(Some(_)) => {}
                     Err(e) => {
                         eprintln!("Error: {:?}", e);
                         return;
                     }
+                }
+            }
+
+            if let Some(environment) = self.environment {
+                for (key, value) in environment {
+                    command.env(key, value);
                 }
             }
 
@@ -159,7 +165,6 @@ impl Job {
                     }
                     Err(e) => {
                         eprintln!("Error: {:?}", e);
-                        // = PermissionDenied
                         return;
                     }
                 }
@@ -176,25 +181,14 @@ impl Job {
                     }
                     Err(e) => {
                         eprintln!("Error: {:?}", e);
-                        // = PermissionDenied
                         return;
                     }
                 }
             }
 
             // if let Some(ref arguments) = self.arguments {
-            //     match OpenOptions::new().write(true).create(true).open(arguments) {
-            //         Ok(file) => {
-            // 			command.args(arguments);
-            //         }
-            //         Err(e) => {
-            //             eprintln!("Error: {:?}", e);
-            //             return;
-            //         }
-            //     }
+            // 		command.args(arguments);
             // }
-
-            // environment
 
             match command.spawn() {
                 Ok(child_process) => {
@@ -215,12 +209,21 @@ impl Job {
 
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
-        // if self.is_running == true {
-        //     match self.processes.kill() { // preciser quel child je kill
-        //         Err(e) => println!("Error: {:?}", e)
-        //     }
-        // } else {
-        //     println!("Process is not running");
-        // }
-    } // stop signal
+        if let Some(child) = self.processes.get_mut(&i) {
+            match child.try_wait() {
+                Ok(None) => {
+                    println!("Process is running.");
+                    child.kill(); // preciser la facon de kill avec self.stop_sign
+                }
+                Ok(Some(_)) => {}
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                    return;
+                }
+            }
+        }
+    }
 }
+
+// split les arguments du job en tableau
+// split l'input du client -> variable pour mettre le process vise ?
