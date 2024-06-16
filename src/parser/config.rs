@@ -59,12 +59,13 @@ impl Config {
             };
             // job is changed case
             if job != old_job {
-                if old_job.is_running {
-                    old_job.stop(&job_name);
-                    job.start(&job_name);
-                } else if job.auto_start {
-                    job.start(&job_name);
-                }
+                old_job.start(&job_name);
+                // if old_job.is_running {
+                //     old_job.stop(&job_name);
+                //     job.start(&job_name);
+                // } else if job.auto_start {
+                //     job.start(&job_name);
+                // }
             }
             old_config.map.remove_entry(&job_name);
         }
@@ -156,6 +157,29 @@ impl Config {
             _ => Ok(default),
         }
     }
+
+    fn _parse_command(raw: &RawConfig) -> Result<Vec<String>> {
+        let file_name: Option<String> = Some(Self::_parse_raw_config_field(
+            raw,
+            "command".into(),
+            String::new(),
+        )?);
+        if let Some(cmd_as_str) = file_name {
+            let cmd: Vec<String> = cmd_as_str.split_whitespace().map(String::from).collect();
+            Ok(cmd)
+        } else {
+            Err(Error::FieldCommandIsNotSet)
+        }
+    }
+
+    // fn _parse_command(raw: &RawConfig) -> Result<String> {
+    //     let file_name: Option<String> = Self::_parse_one_word_field(&raw, "command".into(), None)?;
+    //     if file_name.is_none() {
+    //         Err(Error::FieldCommandIsNotSet)
+    //     } else {
+    //         Ok(file_name.unwrap())
+    //     }
+    // }
 
     fn _parse_umask(raw: &RawConfig) -> Result<Option<String>> {
         let field_name: String = String::from("umask");
@@ -304,15 +328,6 @@ impl Config {
             String::from("autostart"),
             Job::default().auto_start,
         )
-    }
-
-    fn _parse_command(raw: &RawConfig) -> Result<String> {
-        let file_name: Option<String> = Self::_parse_one_word_field(&raw, "command".into(), None)?;
-        if file_name.is_none() {
-            Err(Error::FieldCommandIsNotSet)
-        } else {
-            Ok(file_name.unwrap())
-        }
     }
 
     fn _parse_num_procs(raw: &RawConfig) -> Result<u32> {

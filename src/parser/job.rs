@@ -25,7 +25,8 @@ pub enum StopSignals {
 
 #[derive(Debug)]
 pub struct Job {
-    pub command: String,
+    // pub command: String,
+    pub command: Vec<String>,
     pub num_procs: u32,
     pub auto_start: bool,
     pub auto_restart: AutorestartOptions,
@@ -45,7 +46,7 @@ pub struct Job {
 impl Default for Job {
     fn default() -> Self {
         Job {
-            command: String::new(),
+            command: Vec::new(),
             num_procs: 1,
             auto_start: true,
             auto_restart: AutorestartOptions::UnexpectedExit,
@@ -111,7 +112,13 @@ impl Job {
         println!("log: start {}", job_name);
 
         for i in 0..self.num_procs {
-            let mut command = Command::new(&self.command);
+            let mut command = Command::new(&self.command[0]);
+
+            if self.command.len() > 1 {
+                for argument in self.command.iter().skip(1) {
+                    command.arg(argument);
+                }
+            }
 
             if let Some(child) = self.processes.get_mut(&i) {
                 match child.try_wait() {
@@ -127,7 +134,7 @@ impl Job {
                 }
             }
 
-            if let Some(environment) = self.environment {
+            if let Some(environment) = &self.environment {
                 for (key, value) in environment {
                     command.env(key, value);
                 }
@@ -186,10 +193,6 @@ impl Job {
                 }
             }
 
-            // if let Some(ref arguments) = self.arguments {
-            // 		command.args(arguments);
-            // }
-
             match command.spawn() {
                 Ok(child_process) => {
                     self.processes.insert(i, child_process);
@@ -209,19 +212,19 @@ impl Job {
 
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
-        if let Some(child) = self.processes.get_mut(&i) {
-            match child.try_wait() {
-                Ok(None) => {
-                    println!("Process is running.");
-                    child.kill(); // preciser la facon de kill avec self.stop_sign
-                }
-                Ok(Some(_)) => {}
-                Err(e) => {
-                    eprintln!("Error: {:?}", e);
-                    return;
-                }
-            }
-        }
+        // if let Some(child) = self.processes.get_mut(&i) {
+        //     match child.try_wait() {
+        //         Ok(None) => {
+        //             println!("Process is running.");
+        //             child.kill(); // preciser la facon de kill avec self.stop_sign
+        //         }
+        //         Ok(Some(_)) => {}
+        //         Err(e) => {
+        //             eprintln!("Error: {:?}", e);
+        //             return;
+        //         }
+        //     }
+        // }
     }
 }
 
