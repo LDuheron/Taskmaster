@@ -2,87 +2,71 @@ import cmd
 import sys, tty, termios
 import socket
 import signal
+import sys
+import os
 
-def	sigint_handler(sig, frame):
-	print("\rCtrl-c was pressed. Exiting server.\n")
-	sys.exit(0)
 
-signal.signal(signal.SIGINT, sigint_handler)
+HOST = 'localhost'
+PORT = 4241
 
 # This function allows reading stdin in raw mode (meaning, without expecting the '\n' to transmit the data)
 # only one character per character
 def read_char():
 	fd = sys.stdin.fileno()
 	old_tty_setting = termios.tcgetattr(fd)
-	new_tty_setting = termios.tcgetattr(fd)
 	try:
 		tty.setraw(fd, termios.TCSADRAIN)
 		return sys.stdin.read(1)
 	finally:
 		termios.tcsetattr(fd, termios.TCSADRAIN, old_tty_setting)
 
-# This function ensures the argument is not empty, neither multiple instructions.
-def check_arg(arg):
-	print(arg)
-	if (len(arg) == 0 or (' ' in arg)):
-		print(FORMAT)
-		return False
-	else:
-		return True
-
-# This function convert the string passed as argument to a bytes-like format,
-# then send it to the server.
-def	send_data(str, sock):
+def	send_data(str):
 	try:
-		data = str
-		data_bytes = data.encode('utf-8')
-		sock.send(data_bytes)
-	except Exception as e:
-		print("Error:", e)
-		print('Client deconnexion')
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		sock.connect((HOST, PORT))
+		sock.send(str.encode('utf-8'))
+		print(sock.recv(128))
 		sock.close()
-		exit(0)
+	except Exception as e:
+		print("Error when sending data:", e)
 
 class InputInterpretor(cmd.Cmd):
 	prompt = 'Taskmaster > '
 
-	def	__init__(self, sock):
+	def	__init__(self):
 		super().__init__()
-		self.sock = sock
 
-	def	default(self, arg):
-		print(FORMAT)
+	def	default(self, line):
+		print(f"{line} is invalid...")
+		print("Correct format is: [command] [program]")
+		print("Type 'help' for all commands.")
 	
+	def do_status(self, arg):
+		"""Print the status of all the programs"""
+		send_data(f"status {arg}")
+
 	def do_start(self, arg):
-		'Start the program specified in the argument.\n'
-		if check_arg(arg):
-			send_data("start", sock)
-			print("Start command :) ")
+		"""Start the program specified in argument"""
+		send_data(f"start {arg}")
 	
 	def do_stop(self, arg):
-		'Stop the program specified in the argument.\n'
-		if check_arg(arg):
-			send_data("stop", sock)
-			print("Stop command")
+		"""Stop the program specified in argument"""
+		send_data(f"stop {arg}")
 
 	def do_restart(self, arg=None):
-		'Start the program specified in the argument.\n'
-		if check_arg(arg):
-			send_data("restart", sock)
-			print("Restart command")
+		"""Restart the program specified in argument"""
+		send_data(f"restart {arg}")
 	
 	def do_quit(self, arg):
-		'Disconnect the client and quit the program.\n'
-		print('Client deconnexion')
-		sock.close()
-		return True
+		"""Disconnect the client and quit program"""
+		sys.exit(0)
 
-	def do_update(self, arg):
-		'Update the config file.\n'
-		send_data("update", sock)
-		print('updating the config file')
+	def do_reload(self, arg):
+		"""Reload the config file"""
+		os.system("pkill -hup taskmaster")
+		print("taskmaster config file is reloaded")
 
-	def	emptyline(self):
+	def emptyline(self):
 		pass
 
 	def cmd_loop(self):
@@ -95,12 +79,9 @@ HOST = '127.0.0.1'
 PORT = 4243
 FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.\n"
 
-if __name__ == "__main__":
-	try:
-		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # noter code erreur.
-		sock.connect((HOST, PORT)) # check if ca fail try -> TimeoutError ou InterrruptedError.
-		print('Connected')
-		InputInterpretor(sock).cmdloop()
-	except (TimeoutError, InterruptedError):
-		print('Error: client cannot connect to port')
+def signal_handler(sig, frame):
+    sys.exit(0)
 
+if __name__ == "__main__":
+	signal.signal(signal.SIGINT, signal_handler)
+	InputInterpretor().cmdloop()
