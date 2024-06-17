@@ -1,7 +1,7 @@
 use super::job::{AutorestartOptions, Job, StopSignals};
 use crate::{Error, Result};
 use configparser::ini::Ini;
-use std::{collections::HashMap, string};
+use std::collections::HashMap;
 
 pub type ConfigParserContent = HashMap<String, HashMap<String, Option<String>>>;
 pub type RawConfig = HashMap<String, Option<String>>;
@@ -51,6 +51,7 @@ impl Config {
             };
             // job is changed case
             if job != old_job {
+                // TODO: check if the job is running and handle this
                 old_job.start(&job_name);
                 // if old_job.is_running {
                 //     old_job.stop(&job_name);
@@ -449,7 +450,7 @@ mod tests {
         let command: String = String::from("/bin/test");
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
-             command: {command}",
+             command= {command}",
         ));
         config.parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
@@ -481,7 +482,7 @@ mod tests {
     fn multiple_config_ok() -> Result<()> {
         let (config_parser, mut config) = get_config_parser_and_config(String::from(
             "[cat]
-        command: /bin/cat
+        command= /bin/cat
 
         [netcat]
         command=/bin/nc
@@ -563,6 +564,25 @@ mod tests {
             })
         );
         assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn command_with_arguments() -> Result<()> {
+        let (config_parser, mut config) = get_config_parser_and_config(String::from(
+            "[test]
+             command = nc -nvlp 5555",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get("test".into()).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command: "nc".into(),
+                arguments: Some(vec!("-nvlp".into(), "5555".into())),
+                ..Default::default()
+            },
+        );
         Ok(())
     }
 
@@ -1053,7 +1073,8 @@ mod tests {
         let command: String = String::from("/bin/test");
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
-             command={command} umask=abc",
+             command={command}
+             umask=abc",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));

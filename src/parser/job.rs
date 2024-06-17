@@ -61,6 +61,7 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
+            // TODO: use option
             processes: HashMap::new(),
         }
     }
@@ -85,6 +86,7 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
+            // TODO: use clone()
             processes: HashMap::new(),
         }
     }
