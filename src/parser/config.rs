@@ -1,7 +1,7 @@
 use super::job::{AutorestartOptions, Job, StopSignals};
 use crate::{Error, Result};
 use configparser::ini::Ini;
-use std::collections::HashMap;
+use std::{collections::HashMap, string};
 
 pub type ConfigParserContent = HashMap<String, HashMap<String, Option<String>>>;
 pub type RawConfig = HashMap<String, Option<String>>;
@@ -158,28 +158,49 @@ impl Config {
         }
     }
 
-    fn _parse_command(raw: &RawConfig) -> Result<Vec<String>> {
+    fn _parse_command_line(raw: &RawConfig) -> Result<String> {
         let file_name: Option<String> = Some(Self::_parse_raw_config_field(
             raw,
             "command".into(),
             String::new(),
         )?);
         if let Some(cmd_as_str) = file_name {
-            let cmd: Vec<String> = cmd_as_str.split_whitespace().map(String::from).collect();
-            Ok(cmd)
+            Ok(cmd_as_str)
         } else {
             Err(Error::FieldCommandIsNotSet)
         }
     }
 
-    // fn _parse_command(raw: &RawConfig) -> Result<String> {
-    //     let file_name: Option<String> = Self::_parse_one_word_field(&raw, "command".into(), None)?;
-    //     if file_name.is_none() {
-    //         Err(Error::FieldCommandIsNotSet)
-    //     } else {
-    //         Ok(file_name.unwrap())
-    //     }
-    // }
+    fn _parse_arguments(raw: &RawConfig) -> Result<Option<Vec<String>>> {
+        let cmd = Some(Self::_parse_command_line(raw)?);
+        if let Some(cmd_as_str) = cmd {
+            let args: Vec<String> = cmd_as_str
+                .split_whitespace()
+                .skip(1)
+                .map(String::from)
+                .collect();
+            if args.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(args))
+            }
+        } else {
+            Err(Error::FieldCommandIsNotSet)
+        }
+    }
+
+    fn _parse_command(raw: &RawConfig) -> Result<String> {
+        let string = Some(Self::_parse_command_line(raw)?);
+        if let Some(cmd_as_str) = string {
+            if let Some(cmd) = cmd_as_str.split_whitespace().next() {
+                Ok(cmd.to_string())
+            } else {
+                Err(Error::FieldCommandIsNotSet)
+            }
+        } else {
+            Err(Error::FieldCommandIsNotSet)
+        }
+    }
 
     fn _parse_umask(raw: &RawConfig) -> Result<Option<String>> {
         let field_name: String = String::from("umask");
@@ -341,6 +362,7 @@ impl Config {
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
         Ok(Job {
             command: Self::_parse_command(&raw)?,
+            arguments: Self::_parse_arguments(&raw)?,
             num_procs: Self::_parse_num_procs(&raw)?,
             auto_start: Self::_parse_autostart(&raw)?,
             auto_restart: Self::_parse_autorestart(&raw)?,
