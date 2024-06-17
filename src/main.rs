@@ -31,10 +31,17 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
+fn check_childs(config: &mut Config) {
+    for job in config.iter() {
+        println!("{job:?}");
+    }
+}
+
 fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &String) -> Result<()> {
     let duration = std::time::Duration::from_millis(100);
     for stream in listener.incoming() {
         try_reload_config(config, config_file);
+        check_childs(config);
         match stream {
             Ok(mut s) => {
                 let mut data: [u8; 128] = [0; 128];

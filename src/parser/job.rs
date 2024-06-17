@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
 use std::process::{Child, Command, Stdio};
+use std::time::SystemTime;
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum AutorestartOptions {
     Always,
@@ -11,7 +11,6 @@ pub enum AutorestartOptions {
     UnexpectedExit,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum StopSignals {
     HUP = 1,
@@ -21,6 +20,49 @@ pub enum StopSignals {
     USR1 = 10,
     USR2 = 12,
     TERM = 15,
+}
+
+// http://supervisord.org/subprocess.html#process-states
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ProcessStates {
+    STOPPED,
+    STOPPING,
+    STARTING,
+    RUNNING,
+    EXITED,
+    FATAL,
+    BACKOFF,
+}
+
+#[derive(Debug)]
+pub struct ProcessInfo {
+    pub child: Option<Child>,
+    pub started_at: Option<SystemTime>,
+    pub stopped_at: Option<SystemTime>,
+    pub state: ProcessStates,
+}
+
+impl Default for ProcessInfo {
+    fn default() -> Self {
+        ProcessInfo {
+            child: None,
+            started_at: None,
+            stopped_at: None,
+            state: ProcessStates::STOPPED,
+        }
+    }
+}
+
+impl Clone for ProcessInfo {
+    fn clone(&self) -> Self {
+        ProcessInfo {
+            child: None,
+            started_at: self.started_at,
+            stopped_at: self.stopped_at,
+            state: self.state,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -40,7 +82,7 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
-    pub processes: HashMap<u32, Child>,
+    pub processes: HashMap<u32, ProcessInfo>,
 }
 
 impl Default for Job {
@@ -61,8 +103,12 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
-            // TODO: use option
-            processes: HashMap::new(),
+            processes: HashMap::from([(
+                1,
+                ProcessInfo {
+                    ..Default::default()
+                },
+            )]),
         }
     }
 }
@@ -92,6 +138,7 @@ impl Clone for Job {
     }
 }
 
+// this don't check for processes
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
@@ -116,7 +163,7 @@ impl Job {
     pub fn start(self: &mut Self, job_name: &String) {
         println!("log: start {}", job_name);
 
-        for i in 0..self.num_procs {
+        for i in 1..self.num_procs + 1 {
             let mut command = Command::new(&self.command);
 
             if let Some(args) = &self.arguments {
@@ -125,19 +172,19 @@ impl Job {
                 }
             }
 
-            if let Some(child) = self.processes.get_mut(&i) {
-                match child.try_wait() {
-                    Ok(None) => {
-                        println!("Process is already running.");
-                        continue;
-                    }
-                    Ok(Some(_)) => {}
-                    Err(e) => {
-                        eprintln!("Error: {:?}", e);
-                        return;
-                    }
-                }
-            }
+            //             if let Some(child) = self.processes.get_mut(&i) {
+            //                 match child.try_wait() {
+            //                     Ok(None) => {
+            //                         println!("Process is already running.");
+            //                         continue;
+            //                     }
+            //                     Ok(Some(_)) => {}
+            //                     Err(e) => {
+            //                         eprintln!("Error: {:?}", e);
+            //                         return;
+            //                     }
+            //                 }
+            //             }
 
             if let Some(environment) = &self.environment {
                 for (key, value) in environment {
@@ -199,7 +246,15 @@ impl Job {
 
             match command.spawn() {
                 Ok(child_process) => {
-                    self.processes.insert(i, child_process);
+                    self.processes.insert(
+                        i,
+                        ProcessInfo {
+                            child: Some(child_process),
+                            started_at: Some(SystemTime::now()),
+                            stopped_at: None,
+                            state: ProcessStates::STARTING,
+                        },
+                    );
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);

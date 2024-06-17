@@ -23,6 +23,10 @@ impl Config {
         }
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Job)> {
+        self.map.iter()
+    }
+
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut old_config: Config = self.clone();
         self.map.clear();
