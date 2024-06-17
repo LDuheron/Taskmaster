@@ -4,7 +4,7 @@ mod parser;
 use error::{Error, Result};
 use parser::config::Config;
 use std::io::prelude::*;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 
 const SIGHUP: i32 = 1;
 static mut RELOAD_CONFIG: bool = false;

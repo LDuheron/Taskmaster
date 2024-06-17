@@ -75,10 +75,6 @@ class InputInterpretor(cmd.Cmd):
 			self.cmdloop(char)
 	
 
-HOST = '127.0.0.1'
-PORT = 4243
-FORMAT = "Correct format is : [command] [program]\nType 'help' for all commands.\n"
-
 def signal_handler(sig, frame):
     sys.exit(0)
 

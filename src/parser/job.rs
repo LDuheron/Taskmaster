@@ -25,8 +25,8 @@ pub enum StopSignals {
 
 #[derive(Debug)]
 pub struct Job {
-    // pub command: String,
-    pub command: Vec<String>,
+    pub command: String,
+    pub arguments: Option<Vec<String>>,
     pub num_procs: u32,
     pub auto_start: bool,
     pub auto_restart: AutorestartOptions,
@@ -46,7 +46,8 @@ pub struct Job {
 impl Default for Job {
     fn default() -> Self {
         Job {
-            command: Vec::new(),
+            command: String::new(),
+            arguments: None,
             num_procs: 1,
             auto_start: true,
             auto_restart: AutorestartOptions::UnexpectedExit,
@@ -60,6 +61,7 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
+            // TODO: use option
             processes: HashMap::new(),
         }
     }
@@ -70,6 +72,7 @@ impl Clone for Job {
     fn clone(&self) -> Job {
         Job {
             command: self.command.clone(),
+            arguments: self.arguments.clone(),
             num_procs: self.num_procs,
             auto_start: self.auto_start,
             auto_restart: self.auto_restart.clone(),
@@ -83,6 +86,7 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
+            // TODO: use clone()
             processes: HashMap::new(),
         }
     }
@@ -91,6 +95,7 @@ impl Clone for Job {
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
+            && self.arguments == other.arguments
             && self.num_procs == other.num_procs
             && self.auto_start == other.auto_start
             && self.auto_restart == other.auto_restart
@@ -112,11 +117,11 @@ impl Job {
         println!("log: start {}", job_name);
 
         for i in 0..self.num_procs {
-            let mut command = Command::new(&self.command[0]);
+            let mut command = Command::new(&self.command);
 
-            if self.command.len() > 1 {
-                for argument in self.command.iter().skip(1) {
-                    command.arg(argument);
+            if let Some(args) = &self.arguments {
+                for element in args.iter() {
+                    command.arg(element);
                 }
             }
 
@@ -160,7 +165,6 @@ impl Job {
                 command.current_dir(work_dir);
             }
 
-            // checker si ca vaut none aussi dans ce cas on change rien
             if let Some(ref stderr_file) = self.stderr_file {
                 match OpenOptions::new()
                     .write(true)
@@ -227,6 +231,3 @@ impl Job {
         // }
     }
 }
-
-// split les arguments du job en tableau
-// split l'input du client -> variable pour mettre le process vise ?
