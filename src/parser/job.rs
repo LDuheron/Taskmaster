@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 use std::fs::OpenOptions;
 use std::process::{Child, Command, Stdio};
@@ -41,7 +40,7 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
-    pub processes: HashMap<u32, Child>,
+    pub processes: Option<HashMap<u32, Child>>,
 }
 
 impl Default for Job {
@@ -62,13 +61,11 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
-            // TODO: use option
-            processes: HashMap::new(),
+            processes: None,
         }
     }
 }
 
-// clone() seulement sur les types non primitifs donc deep copy
 impl Clone for Job {
     fn clone(&self) -> Job {
         Job {
@@ -87,8 +84,8 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
-            // TODO: use clone()
-            processes: HashMap::new(),
+			processes: None
+            // processes: self.processes.clone(),
         }
     }
 }
@@ -110,6 +107,7 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
+			// && self.processes == other.processes
     }
 }
 
@@ -120,8 +118,9 @@ impl Job {
         for i in 0..self.num_procs {
             let mut command = Command::new(&self.command);
 
-            if let Some(child) = self.processes.get_mut(&i) {
+            if let Some(child) = &self.processes {
                 println!("Process is already running.");
+				// modifier le if pour cibler le process i
             	continue;
             }
 
@@ -190,7 +189,14 @@ impl Job {
 
             match command.spawn() {
                 Ok(child_process) => {
-                    self.processes.insert(i, child_process);
+					if let Some(ref mut HashMap) = self.processes {
+						HashMap.insert(i, child_process);
+					}
+					else {
+						let mut HashMap: HashMap<u32, Child> = HashMap::new();
+						HashMap.insert(i, child_process);
+						self.processes = Some(HashMap);
+					}
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);
