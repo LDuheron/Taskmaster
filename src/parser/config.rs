@@ -308,17 +308,17 @@ impl Config {
         )
     }
 
-    fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<u8>> {
+    fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<i32>> {
         let field_name: String = String::from("exitcodes");
         match raw.get(&field_name) {
             Some(Some(str)) => str
                 .split(",")
                 .map(str::trim)
                 .map(|s| {
-                    s.parse::<u8>().map_err(|_| Error::CantParseField {
+                    s.parse::<i32>().map_err(|_| Error::CantParseField {
                         field_name: field_name.clone(),
                         value: str.to_string(),
-                        type_name: std::any::type_name::<u8>().into(),
+                        type_name: std::any::type_name::<i32>().into(),
                     })
                 })
                 .collect(),
@@ -734,21 +734,6 @@ mod tests {
             "[{job_name}]
              command={command}
              exitcodes=1, 2, 5, asdf, 4",
-        ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
-        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
-        assert!(config.map.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn exitcodes_overflow() -> Result<()> {
-        let job_name: String = String::from("test");
-        let command: String = String::from("/bin/test");
-        let (config_parser, mut config) = get_config_parser_and_config(format!(
-            "[{job_name}]
-             command={command}
-             exitcodes=1, 2, 5, 256, 4",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
