@@ -1,4 +1,4 @@
-use super::job::{AutorestartOptions, Job, StopSignals};
+use super::job::{AutorestartOptions, Job, ProcessInfo, StopSignals};
 use crate::{Error, Result};
 use configparser::ini::Ini;
 use std::collections::HashMap;
@@ -357,10 +357,11 @@ impl Config {
     }
 
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
+        let num_procs: u32 = Self::_parse_num_procs(&raw)?;
         Ok(Job {
             command: Self::_parse_command(&raw)?,
             arguments: Self::_parse_arguments(&raw)?,
-            num_procs: Self::_parse_num_procs(&raw)?,
+            num_procs,
             auto_start: Self::_parse_autostart(&raw)?,
             auto_restart: Self::_parse_autorestart(&raw)?,
             exit_codes: Self::_parse_exitcodes(&raw)?,
@@ -373,7 +374,7 @@ impl Config {
             environment: Self::_parse_environment(&raw)?,
             work_dir: Self::_parse_working_directory(&raw)?,
             umask: Self::_parse_umask(&raw)?,
-            ..Default::default()
+            processes: vec![ProcessInfo::default(); num_procs as usize],
         })
     }
 }

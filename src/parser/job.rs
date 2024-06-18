@@ -82,7 +82,7 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
-    pub processes: HashMap<u32, ProcessInfo>,
+    pub processes: Vec<ProcessInfo>,
 }
 
 impl Default for Job {
@@ -103,12 +103,7 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
-            processes: HashMap::from([(
-                1,
-                ProcessInfo {
-                    ..Default::default()
-                },
-            )]),
+            processes: vec![ProcessInfo::default()],
         }
     }
 }
@@ -132,8 +127,7 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
-            // TODO: use clone()
-            processes: HashMap::new(),
+            processes: vec![ProcessInfo::default(); self.num_procs as usize],
         }
     }
 }
@@ -163,7 +157,7 @@ impl Job {
     pub fn start(self: &mut Self, job_name: &String) {
         println!("log: start {}", job_name);
 
-        for i in 1..self.num_procs + 1 {
+        for i in 0..self.num_procs {
             let mut command = Command::new(&self.command);
 
             if let Some(args) = &self.arguments {
@@ -246,15 +240,9 @@ impl Job {
 
             match command.spawn() {
                 Ok(child_process) => {
-                    self.processes.insert(
-                        i,
-                        ProcessInfo {
-                            child: Some(child_process),
-                            started_at: Some(SystemTime::now()),
-                            stopped_at: None,
-                            state: ProcessStates::STARTING,
-                        },
-                    );
+                    self.processes[i as usize].child = Some(child_process);
+                    self.processes[i as usize].state = ProcessStates::STARTING;
+                    self.processes[i as usize].started_at = Some(SystemTime::now());
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);
