@@ -306,6 +306,11 @@ impl Job {
         match child.try_wait() {
             Ok(Some(status)) => match self.auto_restart {
                 AutorestartOptions::Always if process.nb_retries <= self.start_retries => {
+                    // process is terminated by signal
+                    if status.code().is_none() {
+                        self.processes[proc_index] = ProcessInfo::default();
+                        return;
+                    }
                     process.nb_retries += 1;
                     process.state = ProcessStates::BACKOFF;
                     println!("LOG: {job_name}:{proc_index} is now in BACKOFF state");
@@ -322,9 +327,11 @@ impl Job {
                             self.start(job_name);
                         }
                     } else {
+                        // process is terminated by signal
                         self.processes[proc_index] = ProcessInfo::default();
                     }
                 }
+                // process can't autorestart
                 _ => self.processes[proc_index] = ProcessInfo::default(),
             },
             Ok(None) => {
