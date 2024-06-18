@@ -1,4 +1,5 @@
 mod error;
+mod logger;
 mod parser;
 
 use error::{Error, Result};
