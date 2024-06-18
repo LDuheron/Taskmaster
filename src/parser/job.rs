@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::path::Path;
 use std::fs::OpenOptions;
 use std::process::{Child, Command, Stdio};
 
@@ -119,30 +120,17 @@ impl Job {
         for i in 0..self.num_procs {
             let mut command = Command::new(&self.command);
 
-            if let Some(args) = &self.arguments {
-                for element in args.iter() {
-                    command.arg(element);
-                }
+            if let Some(child) = self.processes.get_mut(&i) {
+                println!("Process is already running.");
+            	continue;
             }
 
-            if let Some(child) = self.processes.get_mut(&i) {
-                match child.try_wait() {
-                    Ok(None) => {
-                        println!("Process is already running.");
-                        continue;
-                    }
-                    Ok(Some(_)) => {}
-                    Err(e) => {
-                        eprintln!("Error: {:?}", e);
-                        return;
-                    }
-                }
+            if let Some(args) = &self.arguments {
+				command.args(args);
             }
 
             if let Some(environment) = &self.environment {
-                for (key, value) in environment {
-                    command.env(key, value);
-                }
+				command.envs(environment);
             }
 
             // if let Some(ref config_umask) = self.umask {
@@ -157,12 +145,15 @@ impl Job {
             //     }
             // }
 
-            if let Some(ref work_dir) = self.work_dir {
-                if fs::metadata(work_dir).is_err() {
-                    eprintln!("Error: {:?}", work_dir);
+			if let Some(ref work_dir) = self.work_dir {
+				let path = Path::new(work_dir);
+				if path.is_dir() == true {
+	                command.current_dir(work_dir);
+				}
+				else {
+					eprintln!("Error: {:?}", work_dir);
                     return;
-                }
-                command.current_dir(work_dir);
+				}
             }
 
             if let Some(ref stderr_file) = self.stderr_file {
