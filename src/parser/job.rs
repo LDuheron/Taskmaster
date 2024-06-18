@@ -273,4 +273,41 @@ impl Job {
         //     }
         // }
     }
+
+    pub fn processes_routine(self: &mut Self, job_name: &String) {
+        let nb_processes: usize = self.num_procs as usize;
+        for i in 0..nb_processes {
+            match self.processes[i].state {
+                ProcessStates::STARTING => self._handle_starting(i),
+                ProcessStates::STOPPING => self._handle_stopping(i),
+                _ => return,
+            };
+        }
+    }
+
+    fn _handle_starting(self: &mut Self, proc_index: usize) {
+        let process = &mut self.processes[proc_index];
+        let child: &mut [Child] = process.child.as_mut_slice();
+        match child[0].try_wait() {
+            Ok(Some(status)) => println!("exited with: {status}"),
+            Ok(None) => {
+                if process
+                    .started_at
+                    .unwrap()
+                    .elapsed()
+                    .unwrap_or_default()
+                    .as_secs()
+                    >= self.start_secs.into()
+                {
+                    process.state = ProcessStates::RUNNING;
+                }
+            }
+            Err(e) => println!("error attempting to wait: {e}"),
+        }
+    }
+
+    fn _handle_stopping(&mut self, proc_index: usize) {
+        let process = &mut self.processes[proc_index];
+        todo!();
+    }
 }

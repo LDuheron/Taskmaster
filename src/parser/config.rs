@@ -27,6 +27,12 @@ impl Config {
         self.map.iter()
     }
 
+    pub fn jobs_routine(&mut self) {
+        for (job_name, job) in self.map.iter_mut() {
+            job.processes_routine(job_name);
+        }
+    }
+
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut old_config: Config = self.clone();
         self.map.clear();
@@ -40,10 +46,8 @@ impl Config {
             return Ok(());
         }
         println!("log: reload config with {}", config_path);
-        for entry in self.map.iter_mut() {
-            let job_name: String = entry.0.into();
-            let job: &mut Job = entry.1;
-            let old_job: &mut Job = match old_config.map.get_mut(&job_name) {
+        for (job_name, job) in self.map.iter_mut() {
+            let old_job: &mut Job = match old_config.map.get_mut(job_name) {
                 Some(j) => j,
                 // new job case
                 _ => {
@@ -64,12 +68,10 @@ impl Config {
                 //     job.start(&job_name);
                 // }
             }
-            old_config.map.remove_entry(&job_name);
+            old_config.map.remove_entry(job_name);
         }
         // job is not present in new config file
-        for entry in old_config.map.iter_mut() {
-            let old_job_name: String = entry.0.into();
-            let old_job: &mut Job = entry.1;
+        for (old_job_name, old_job) in old_config.map.iter_mut() {
             old_job.stop(&old_job_name);
         }
         Ok(())
