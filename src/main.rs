@@ -1,12 +1,6 @@
 mod error;
 mod parser;
 
-// https://doc.rust-lang.org/std/net/struct.TcpListener.html
-// https://doc.rust-lang.org/book/ch20-01-single-threaded.html
-
-// Erreurs : si le server exit, le client continue d'envoyer des messages
-// Gerer le controle c cote serveur
-// gerer plusieurs clients -> bloquer les autres
 use error::{Error, Result};
 use parser::config::Config;
 use std::io::prelude::*;

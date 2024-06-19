@@ -1,6 +1,7 @@
+// use libc::{kill, SIGTERM};
 use std::collections::HashMap;
-use std::path::Path;
 use std::fs::OpenOptions;
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 
 #[allow(dead_code)]
@@ -84,8 +85,7 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
-			processes: None
-            // processes: self.processes.clone(),
+            processes: None, // processes: self.processes.clone(),
         }
     }
 }
@@ -107,7 +107,7 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
-			// && self.processes == other.processes
+        // && self.processes == other.processes
     }
 }
 
@@ -118,18 +118,18 @@ impl Job {
         for i in 0..self.num_procs {
             let mut command = Command::new(&self.command);
 
-            if let Some(child) = &self.processes {
+            if self.processes.is_some() {
                 println!("Process is already running.");
-				// modifier le if pour cibler le process i
-            	continue;
+                // modifier le if pour cibler le process i
+                continue;
             }
 
             if let Some(args) = &self.arguments {
-				command.args(args);
+                command.args(args);
             }
 
             if let Some(environment) = &self.environment {
-				command.envs(environment);
+                command.envs(environment);
             }
 
             // if let Some(ref config_umask) = self.umask {
@@ -144,15 +144,14 @@ impl Job {
             //     }
             // }
 
-			if let Some(ref work_dir) = self.work_dir {
-				let path = Path::new(work_dir);
-				if path.is_dir() == true {
-	                command.current_dir(work_dir);
-				}
-				else {
-					eprintln!("Error: {:?}", work_dir);
+            if let Some(ref work_dir) = self.work_dir {
+                let path = Path::new(work_dir);
+                if path.is_dir() == true {
+                    command.current_dir(work_dir);
+                } else {
+                    eprintln!("Error: {:?}", work_dir);
                     return;
-				}
+                }
             }
 
             if let Some(ref stderr_file) = self.stderr_file {
@@ -189,14 +188,13 @@ impl Job {
 
             match command.spawn() {
                 Ok(child_process) => {
-					if let Some(ref mut HashMap) = self.processes {
-						HashMap.insert(i, child_process);
-					}
-					else {
-						let mut HashMap: HashMap<u32, Child> = HashMap::new();
-						HashMap.insert(i, child_process);
-						self.processes = Some(HashMap);
-					}
+                    if let Some(ref mut map) = self.processes {
+                        map.insert(i, child_process);
+                    } else {
+                        let mut map: HashMap<u32, Child> = HashMap::new();
+                        map.insert(i, child_process);
+                        self.processes = Some(map);
+                    }
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);
@@ -213,17 +211,21 @@ impl Job {
 
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
-        // if let Some(child) = self.processes.get_mut(&i) {
-        //     match child.try_wait() {
-        //         Ok(None) => {
-        //             println!("Process is running.");
-        //             child.kill(); // preciser la facon de kill avec self.stop_sign
+
+        // if let Some(ref mut map) = &self.processes {
+        //     if let Some(child) = map.get(&0) {
+        //         println!("Process is running.");
+        //         let mut child_id: u32 = child.id();
+        //         if let Some(mut signal) = self.stop_signal {
+        //             unsafe {
+        //                 kill(child_id, signal);
+        //             }
         //         }
-        //         Ok(Some(_)) => {}
-        //         Err(e) => {
-        //             eprintln!("Error: {:?}", e);
-        //             return;
-        //         }
+		// 		else {
+		// 			unsafe {
+        //                 kill(child_id, SIGTERM);
+        //             }
+		// 		}
         //     }
         // }
     }
