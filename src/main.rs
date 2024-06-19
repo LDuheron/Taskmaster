@@ -35,7 +35,8 @@ fn _parse_client_cmd(raw: String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
 		let index = cmd.find(":");
 		if index.is_some() {
-			let mut split_cmd = 
+			// TODO!
+			// let mut split_cmd = 
 			Ok(cmd.to_string())
 		}
 		else {
@@ -50,7 +51,7 @@ fn _parse_client_arg(raw: String) -> Result<String> {
 	if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         Ok(cmd.to_string())
     } else {
-        Err(Error::FieldCommandIsNotSet)
+        Err(Error::FieldCommandIsNotSet) // repondre au client + new errror
     }
 }
 
@@ -74,14 +75,14 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // and return a message
                 // is it a fatal error ?
                 let client_cmd = _parse_client_cmd(formatted.clone());
-				let client_arg =_parse_client_arg(formatted);
-				
+				let client_arg =_parse_client_arg(formatted); // ref if let
+				// TODO 
 				// let client_target_process: _parse_client_process(formatted);
                 match client_cmd {
                     Ok(cmd) if cmd == "start" => {
                         println!("start");
                         println!("{:?}", client_arg);
-
+						config.get_mut(&String::from("open_terminal")).unwrap().start(&String::from("open_terminal")); // error 
                     }
 					Ok(cmd) if cmd == "stop" => {
                         println!("stop");
@@ -134,3 +135,7 @@ fn main() -> Result<()> {
     server_routine(&listener, &mut config, &config_file)?;
     Ok(())
 }
+
+
+// to do -> parser le job 
+// split si num proc > 
