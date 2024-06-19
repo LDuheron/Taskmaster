@@ -41,6 +41,7 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
+    // TODO
     pub processes: Option<HashMap<u32, Child>>,
 }
 
@@ -62,6 +63,7 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
+            // TODO
             processes: None,
         }
     }
@@ -85,7 +87,7 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
-            processes: None, // processes: self.processes.clone(),
+            processes: None, // TODO
         }
     }
 }
@@ -107,6 +109,7 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
+        // TODO
         // && self.processes == other.processes
     }
 }
@@ -118,9 +121,9 @@ impl Job {
         for i in 0..self.num_procs {
             let mut command = Command::new(&self.command);
 
+            // TODO : modifier le if pour cibler le process[i]
             if self.processes.is_some() {
                 println!("Process is already running.");
-                // modifier le if pour cibler le process i
                 continue;
             }
 
@@ -191,6 +194,7 @@ impl Job {
                     if let Some(ref mut map) = self.processes {
                         map.insert(i, child_process);
                     } else {
+                        // TODO : modify to the new vector
                         let mut map: HashMap<u32, Child> = HashMap::new();
                         map.insert(i, child_process);
                         self.processes = Some(map);
@@ -221,11 +225,11 @@ impl Job {
         //                 kill(child_id, signal);
         //             }
         //         }
-		// 		else {
-		// 			unsafe {
+        // 		else {
+        // 			unsafe {
         //                 kill(child_id, SIGTERM);
         //             }
-		// 		}
+        // 		}
         //     }
         // }
     }
