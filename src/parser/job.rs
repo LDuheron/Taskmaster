@@ -26,13 +26,13 @@ pub enum StopSignals {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ProcessStates {
-    STOPPED,
-    STOPPING,
-    STARTING,
-    RUNNING,
-    EXITED,
-    FATAL,
-    BACKOFF,
+    Stopped,
+    Stopping,
+    Starting,
+    Running,
+    Exited,
+    Fatal,
+    Backoff,
 }
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ impl Default for ProcessInfo {
         ProcessInfo {
             child: None,
             state_changed_at: Instant::now(),
-            state: ProcessStates::STOPPED,
+            state: ProcessStates::Stopped,
             nb_retries: 0,
         }
     }
@@ -167,7 +167,7 @@ impl Job {
 
         for i in 0..self.num_procs {
             // something like that to avoid overriding process
-            if self.processes[i as usize].state != ProcessStates::STOPPED {
+            if self.processes[i as usize].state != ProcessStates::Stopped {
                 return;
             }
             let mut command = Command::new(&self.command);
@@ -253,7 +253,7 @@ impl Job {
             match command.spawn() {
                 Ok(child_process) => {
                     self.processes[i as usize].child = Some(child_process);
-                    self.processes[i as usize].set_state(ProcessStates::STARTING);
+                    self.processes[i as usize].set_state(ProcessStates::Starting);
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);
@@ -283,69 +283,148 @@ impl Job {
         //         }
         //     }
         // }
+        self.processes[0].set_state(ProcessStates::Stopping);
     }
 
+    // inspired by supervisord:
+    // http://supervisord.org/subprocess.html#process-states
     pub fn processes_routine(self: &mut Self, job_name: &String) {
         let nb_processes: usize = self.num_procs as usize;
-        for i in 0..nb_processes {
-            match self.processes[i].state {
-                ProcessStates::STARTING => self._handle_starting(i, job_name),
-                ProcessStates::STOPPING => self._handle_stopping(i, job_name),
+        for process_index in 0..nb_processes {
+            match self.processes[process_index].state {
+                ProcessStates::Starting => self._handle_starting(process_index, job_name),
+                ProcessStates::Backoff => self._handle_backoff(process_index, job_name),
+                ProcessStates::Stopping => self._handle_stopping(process_index, job_name),
+                ProcessStates::Running => self._handle_running(process_index, job_name),
+                ProcessStates::Exited => self._handle_exited(process_index, job_name),
+                // fatal and stopped need user interaction to change
                 _ => return,
             };
         }
     }
 
-    fn _handle_starting(self: &mut Self, proc_index: usize, job_name: &String) {
-        let process = &mut self.processes[proc_index];
+    fn _handle_starting(self: &mut Self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
         let child: &mut Child = if let Some(c) = &mut process.child {
             c
         } else {
             panic!("Why process state is STARTING but child is NONE ????");
         };
         match child.try_wait() {
-            Ok(Some(status)) => match self.auto_restart {
-                AutorestartOptions::Always if process.nb_retries <= self.start_retries => {
-                    // process is terminated by signal
-                    if status.code().is_none() {
-                        self.processes[proc_index] = ProcessInfo::default();
-                        return;
-                    }
-                    process.nb_retries += 1;
-                    process.state = ProcessStates::BACKOFF;
-                    println!("LOG: {job_name}:{proc_index} is now in BACKOFF state");
-                    // TODO: specify the process number
-                    self.start(job_name);
-                }
-                AutorestartOptions::UnexpectedExit if process.nb_retries <= self.start_retries => {
-                    if let Some(code) = status.code() {
-                        if !self.exit_codes.contains(&code) {
-                            process.nb_retries += 1;
-                            process.state = ProcessStates::BACKOFF;
-                            println!("LOG: {job_name}:{proc_index} is now in BACKOFF state");
-                            // TODO: specify the process number
-                            self.start(job_name);
-                        }
-                    } else {
-                        // process is terminated by signal
-                        self.processes[proc_index] = ProcessInfo::default();
-                    }
-                }
-                // process can't autorestart
-                _ => self.processes[proc_index] = ProcessInfo::default(),
-            },
+            Ok(Some(_)) => {
+                process.set_state(ProcessStates::Backoff);
+                process.child = None;
+                println!("LOG: {job_name}:{process_index} is now in BACKOFF state");
+            }
             Ok(None) => {
                 if process.state_changed_at.elapsed().as_secs() >= self.start_secs as u64 {
-                    process.set_state(ProcessStates::RUNNING);
-                    println!("LOG: {job_name}:{proc_index} is now in RUNNING state");
+                    process.nb_retries = 0;
+                    process.set_state(ProcessStates::Running);
+                    println!("LOG: {job_name}:{process_index} is now in RUNNING state");
                 }
             }
-            Err(e) => println!("error attempting to wait: {e}"),
+            Err(e) => println!("Error attempting to wait: {e}"),
         }
     }
 
-    fn _handle_stopping(&mut self, proc_index: usize, job_name: &String) {
-        let process = &mut self.processes[proc_index];
-        todo!();
+    fn _handle_backoff(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        if self.auto_restart != AutorestartOptions::Never && process.nb_retries < self.start_retries
+        {
+            self._restart_process(process_index, job_name);
+            return;
+        }
+        process.nb_retries = 0;
+        process.set_state(ProcessStates::Fatal);
+        println!("LOG: {job_name}:{process_index} is now in FATAL state");
+    }
+
+    fn _handle_stopping(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        let child: &mut Child = if let Some(c) = &mut process.child {
+            c
+        } else {
+            panic!("Why process state is STOPPING but child is NONE ????");
+        };
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                process.set_state(ProcessStates::Stopped);
+                process.child = None;
+                println!("LOG: {job_name}:{process_index} is now in STOPPED state");
+            }
+            Ok(None) => {
+                if process.state_changed_at.elapsed().as_secs() >= self.stop_wait_secs as u64 {
+                    let _ = child.kill();
+                    process.set_state(ProcessStates::Stopped);
+                    println!("LOG: {job_name}:{process_index} is now in STOPPED state");
+                }
+            }
+            Err(e) => eprintln!("Error attempting to wait: {e}"),
+        }
+    }
+
+    fn _handle_running(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        let child: &mut Child = if let Some(c) = &mut process.child {
+            c
+        } else {
+            panic!("Why process state is RUNNING but child is NONE ????");
+        };
+        match child.try_wait() {
+            Ok(Some(status)) if status.code().is_none() => {
+                // terminated by signal
+                process.set_state(ProcessStates::Stopped);
+                println!("LOG: {job_name}:{process_index} is now in STOPPED state");
+            }
+            Ok(Some(_)) => {
+                process.set_state(ProcessStates::Exited);
+                println!("LOG: {job_name}:{process_index} is now in EXITED state");
+            }
+            Err(e) => eprintln!("Error attempting to wait: {e}"),
+            _ => return,
+        }
+    }
+
+    fn _handle_exited(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        let child: &mut Child = if let Some(c) = &mut process.child {
+            c
+        } else {
+            return;
+        };
+        match child.try_wait() {
+            Ok(Some(status)) if status.code().is_none() => {
+                panic!("Why process state is EXITED but it's terminated by SIGNAL ????");
+            }
+            Ok(Some(status)) => {
+                // is safe: process can't be in exited state and terminated by signal
+                let code: i32 = status.code().unwrap();
+                let nb_retry_is_ok: bool = process.nb_retries < self.start_retries;
+                if self.auto_restart == AutorestartOptions::Always && nb_retry_is_ok {
+                    self._restart_process(process_index, job_name);
+                    return;
+                }
+                if self.auto_restart == AutorestartOptions::UnexpectedExit
+                    && self.exit_codes.contains(&code) == true
+                    && nb_retry_is_ok
+                {
+                    self._restart_process(process_index, job_name);
+                    return;
+                }
+            }
+            Err(e) => eprintln!("Error attempting to wait: {e}"),
+            Ok(None) => panic!("Why process state is EXITED but process is not TERMINATED ????"),
+        }
+    }
+
+    fn _restart_process(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        // wait beetween restarts like supervisord (one sec * nb retry)
+        if (process.state_changed_at.elapsed().as_secs() as u32) < process.nb_retries {
+            return;
+        }
+        // TODO: specify the process number here
+        process.nb_retries += 1;
+        self.start(job_name);
     }
 }
