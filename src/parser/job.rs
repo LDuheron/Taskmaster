@@ -360,6 +360,7 @@ impl Job {
             return;
         }
         process.nb_retries = 0;
+        process.child = None;
         process.set_state(ProcessStates::Fatal);
         println!("LOG: {job_name}:{process_index} is now in FATAL state");
     }
