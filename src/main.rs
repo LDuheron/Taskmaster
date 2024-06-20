@@ -3,7 +3,6 @@ mod parser;
 
 use error::{Error, Result};
 use parser::config::Config;
-use parser::job::ProcessInfo;
 use std::io::prelude::*;
 use std::net::TcpListener;
 

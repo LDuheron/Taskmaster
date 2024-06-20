@@ -70,6 +70,23 @@ impl ProcessInfo {
         self.state = state;
         self.state_changed_at = Instant::now();
     }
+
+    pub fn can_start(self: &Self) -> bool {
+        match self.state {
+            ProcessStates::Stopped => true,
+            ProcessStates::Fatal => true,
+            ProcessStates::Exited => true,
+            _ => false,
+        }
+    }
+
+    pub fn can_stop(self: &Self) -> bool {
+        match self.state {
+            ProcessStates::Running => true,
+            ProcessStates::Starting => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -166,8 +183,10 @@ impl Job {
         println!("log: start {}", job_name);
 
         for i in 0..self.num_procs {
+            let process: &mut ProcessInfo = &mut self.processes[i as usize];
             // something like that to avoid overriding process
-            if self.processes[i as usize].state != ProcessStates::Stopped {
+            if process.can_start() == false {
+                eprintln!("Process can't be started");
                 return;
             }
             let mut command = Command::new(&self.command);
@@ -252,8 +271,8 @@ impl Job {
 
             match command.spawn() {
                 Ok(child_process) => {
-                    self.processes[i as usize].child = Some(child_process);
-                    self.processes[i as usize].set_state(ProcessStates::Starting);
+                    process.child = Some(child_process);
+                    process.set_state(ProcessStates::Starting);
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);
@@ -268,7 +287,14 @@ impl Job {
         self.start(job_name);
     }
 
+    // TODO: stop if state is starting or running
     pub fn stop(self: &mut Self, job_name: &String) {
+        // TODO: change the index
+        let process: &mut ProcessInfo = &mut self.processes[0];
+        if process.can_stop() == false {
+            eprintln!("Process can't be started");
+            return;
+        }
         println!("log: stop {}", job_name);
         // if let Some(child) = self.processes.get_mut(&i) {
         //     match child.try_wait() {
@@ -286,8 +312,7 @@ impl Job {
         self.processes[0].set_state(ProcessStates::Stopping);
     }
 
-    // inspired by supervisord:
-    // http://supervisord.org/subprocess.html#process-states
+    // from http://supervisord.org/subprocess.html#process-states
     pub fn processes_routine(self: &mut Self, job_name: &String) {
         let nb_processes: usize = self.num_procs as usize;
         for process_index in 0..nb_processes {
