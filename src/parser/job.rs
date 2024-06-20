@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -122,13 +121,6 @@ impl Job {
             let mut command = Command::new(&self.command);
 
             // TODO : modifier le if pour cibler le process[i]
-            if self.processes.is_some() {
-				if self.processes.is_some_and(Some(self.processes).is_empty()) {
-               		println!("Process is already running.");
-                	continue;
-				}
-            }
-
             if let Some(args) = &self.arguments {
                 command.args(args);
             }
@@ -221,24 +213,23 @@ impl Job {
         if let Some(ref mut map) = self.processes {
             if let Some(child) = map.get_mut(&0) {
                 println!("Process is running.");
-				// Functional version version
+                // Functional version version
                 child.kill();
-				map.remove(&0);
-				
-				
-				// let mut child_id: u32 = child.id();
-				
+                map.remove(&0);
+
+                // let mut child_id: u32 = child.id();
+
                 // if let Some(mut signal) = self.stop_signal {
                 //     unsafe {
                 //         kill(child_id, signal);
                 //     }
                 // }
-        		// else {
-        		// 	unsafe {
+                // else {
+                // 	unsafe {
                 //         kill(child_id, SIGTERM);
                 //     }
-        		// }
-				// map.remove(&0);
+                // }
+                // map.remove(&0);
             }
         }
     }
