@@ -106,7 +106,7 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                                 .restart(&String::from(&arg)); // error
                         }
                     }
-                    Ok(_) => todo!(),
+                    Ok(_) => {continue;}
                     Err(e) => {
                         println!("Error: {}", e);
                     }
