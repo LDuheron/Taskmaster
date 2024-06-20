@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
@@ -20,9 +23,10 @@ pub enum StopSignals {
     TERM = 15,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Job {
     pub command: String,
+    pub arguments: Option<Vec<String>>,
     pub num_procs: u32,
     pub auto_start: bool,
     pub auto_restart: AutorestartOptions,
@@ -36,13 +40,15 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<String>,
-    pub is_running: bool,
+    // TODO
+    pub processes: Option<HashMap<u32, Child>>,
 }
 
 impl Default for Job {
     fn default() -> Self {
         Job {
             command: String::new(),
+            arguments: None,
             num_procs: 1,
             auto_start: true,
             auto_restart: AutorestartOptions::UnexpectedExit,
@@ -56,15 +62,39 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
-            is_running: false,
+            // TODO
+            processes: None,
         }
     }
 }
 
-// !!! is_running is not check
+impl Clone for Job {
+    fn clone(&self) -> Job {
+        Job {
+            command: self.command.clone(),
+            arguments: self.arguments.clone(),
+            num_procs: self.num_procs,
+            auto_start: self.auto_start,
+            auto_restart: self.auto_restart.clone(),
+            exit_codes: self.exit_codes.clone(),
+            start_secs: self.start_secs,
+            start_retries: self.start_retries,
+            stop_signal: self.stop_signal.clone(),
+            stop_wait_secs: self.stop_wait_secs,
+            stderr_file: self.stderr_file.clone(),
+            stdout_file: self.stdout_file.clone(),
+            environment: self.environment.clone(),
+            work_dir: self.work_dir.clone(),
+            umask: self.umask.clone(),
+            processes: None, // TODO
+        }
+    }
+}
+
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
+            && self.arguments == other.arguments
             && self.num_procs == other.num_procs
             && self.auto_start == other.auto_start
             && self.auto_restart == other.auto_restart
@@ -78,13 +108,97 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
+        // TODO
+        // && self.processes == other.processes
     }
 }
 
 impl Job {
     pub fn start(self: &mut Self, job_name: &String) {
         println!("log: start {}", job_name);
-        self.is_running = true;
+
+        for i in 0..self.num_procs {
+            let mut command = Command::new(&self.command);
+
+            // TODO : modifier le if pour cibler le process[i]
+            if let Some(args) = &self.arguments {
+                command.args(args);
+            }
+
+            if let Some(environment) = &self.environment {
+                command.envs(environment);
+            }
+
+            // if let Some(ref config_umask) = self.umask {
+            //     match command.pre_exec( || {
+            //         unsafe { libc::umask(config_umask) }; // checker si c'est le bon input
+            //     }) {
+            //         Ok(_) => {}
+            //         Err(e) => {
+            //             eprintln!("Error: {:?}", e);
+            //             return;
+            //         }
+            //     }
+            // }
+
+            if let Some(ref work_dir) = self.work_dir {
+                let path = Path::new(work_dir);
+                if path.is_dir() == true {
+                    command.current_dir(work_dir);
+                } else {
+                    eprintln!("Error: {:?}", work_dir);
+                    return;
+                }
+            }
+
+            if let Some(ref stderr_file) = self.stderr_file {
+                match OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(stderr_file)
+                {
+                    Ok(file) => {
+                        command.stderr(Stdio::from(file));
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {:?}", e);
+                        return;
+                    }
+                }
+            }
+
+            if let Some(ref stdout_file) = self.stdout_file {
+                match OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(stdout_file)
+                {
+                    Ok(file) => {
+                        command.stdout(Stdio::from(file));
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {:?}", e);
+                        return;
+                    }
+                }
+            }
+
+            match command.spawn() {
+                Ok(child_process) => {
+                    if let Some(ref mut map) = self.processes {
+                        map.insert(i, child_process);
+                    } else {
+                        // TODO : modify to the new vector
+                        let mut map: HashMap<u32, Child> = HashMap::new();
+                        map.insert(i, child_process);
+                        self.processes = Some(map);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to start process: {:?}", e);
+                }
+            }
+        }
     }
 
     pub fn restart(self: &mut Self, job_name: &String) {
@@ -95,6 +209,28 @@ impl Job {
 
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
-        self.is_running = true;
+
+        if let Some(ref mut map) = self.processes {
+            if let Some(child) = map.get_mut(&0) {
+                println!("Process is running.");
+                // Functional version version
+                child.kill();
+                map.remove(&0);
+
+                // let mut child_id: u32 = child.id();
+
+                // if let Some(mut signal) = self.stop_signal {
+                //     unsafe {
+                //         kill(child_id, signal);
+                //     }
+                // }
+                // else {
+                // 	unsafe {
+                //         kill(child_id, SIGTERM);
+                //     }
+                // }
+                // map.remove(&0);
+            }
+        }
     }
 }

@@ -73,6 +73,7 @@ class InputInterpretor(cmd.Cmd):
 		while (42):
 			char = read_char()
 			self.cmdloop(char)
+	
 
 def signal_handler(sig, frame):
     sys.exit(0)
