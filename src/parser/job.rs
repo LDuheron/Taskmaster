@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::fs;
 use std::fs::OpenOptions;
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::Instant;
 
@@ -76,6 +76,7 @@ impl ProcessInfo {
             ProcessStates::Stopped => true,
             ProcessStates::Fatal => true,
             ProcessStates::Exited => true,
+            ProcessStates::Backoff => true,
             _ => false,
         }
     }
@@ -174,6 +175,8 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
+        // TODO
+        // && self.processes == other.processes
     }
 }
 
@@ -191,30 +194,13 @@ impl Job {
             }
             let mut command = Command::new(&self.command);
 
+            // TODO : modifier le if pour cibler le process[i]
             if let Some(args) = &self.arguments {
-                for element in args.iter() {
-                    command.arg(element);
-                }
+                command.args(args);
             }
 
-            //             if let Some(child) = self.processes.get_mut(&i) {
-            //                 match child.try_wait() {
-            //                     Ok(None) => {
-            //                         println!("Process is already running.");
-            //                         continue;
-            //                     }
-            //                     Ok(Some(_)) => {}
-            //                     Err(e) => {
-            //                         eprintln!("Error: {:?}", e);
-            //                         return;
-            //                     }
-            //                 }
-            //             }
-
             if let Some(environment) = &self.environment {
-                for (key, value) in environment {
-                    command.env(key, value);
-                }
+                command.envs(environment);
             }
 
             // if let Some(ref config_umask) = self.umask {
@@ -230,11 +216,13 @@ impl Job {
             // }
 
             if let Some(ref work_dir) = self.work_dir {
-                if fs::metadata(work_dir).is_err() {
+                let path = Path::new(work_dir);
+                if path.is_dir() == true {
+                    command.current_dir(work_dir);
+                } else {
                     eprintln!("Error: {:?}", work_dir);
                     return;
                 }
-                command.current_dir(work_dir);
             }
 
             if let Some(ref stderr_file) = self.stderr_file {
@@ -296,19 +284,8 @@ impl Job {
             return;
         }
         println!("log: stop {}", job_name);
-        // if let Some(child) = self.processes.get_mut(&i) {
-        //     match child.try_wait() {
-        //         Ok(None) => {
-        //             println!("Process is running.");
-        //             child.kill(); // preciser la facon de kill avec self.stop_sign
-        //         }
-        //         Ok(Some(_)) => {}
-        //         Err(e) => {
-        //             eprintln!("Error: {:?}", e);
-        //             return;
-        //         }
-        //     }
-        // }
+        let _ = process.child.as_mut().unwrap().kill();
+        process.child = None;
         self.processes[0].set_state(ProcessStates::Stopping);
     }
 

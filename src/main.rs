@@ -31,6 +31,29 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
+fn _parse_client_cmd(raw: &String) -> Result<String> {
+    if let Some(cmd) = raw.split_whitespace().next() {
+        let index = cmd.find(":");
+        if index.is_some() {
+            // TODO!          // let mut split_cmd =
+
+            Ok(cmd.to_string())
+        } else {
+            Ok(cmd.to_string())
+        }
+    } else {
+        Err(Error::FieldCommandIsNotSet)
+    }
+}
+
+fn _parse_client_arg(raw: &String) -> Result<String> {
+    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
+        Ok(cmd.to_string())
+    } else {
+        Err(Error::FieldCommandIsNotSet) // repondre au client + new errror
+    }
+}
+
 fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &String) -> Result<()> {
     let duration = std::time::Duration::from_millis(100);
     for stream in listener.incoming() {
@@ -46,11 +69,37 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                     std::thread::sleep(duration);
                     continue;
                 }
-                let formatted = String::from_utf8_lossy(&data[..bytes_read]);
+                let formatted = String::from_utf8_lossy(&data[..bytes_read]).into_owned();
                 println!("read: {}", formatted);
-                // do something with the message from the client
-                // and return a message
-                // is it a fatal error ?
+                let client_cmd = _parse_client_cmd(&formatted);
+                let client_arg = _parse_client_arg(&formatted);
+                // TODO
+                // let client_target_process: _parse_client_process(formatted);
+                match client_cmd {
+                    Ok(cmd) if cmd == "start" => {
+                        config
+                            .get_mut(&String::from("term"))
+                            .unwrap()
+                            .start(&String::from("term")); // error
+                    }
+                    Ok(cmd) if cmd == "stop" => {
+                        println!("stop");
+                        if client_arg.is_ok() {
+                            config
+                                .get_mut(&String::from("term"))
+                                .unwrap()
+                                .stop(&String::from("term")); // error
+                        }
+                    }
+                    Ok(cmd) if cmd == "restart" => {
+                        println!("restart");
+                    }
+                    Ok(_) => todo!(),
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
+                }
+
                 s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -89,3 +138,6 @@ fn main() -> Result<()> {
     server_routine(&listener, &mut config, &config_file)?;
     Ok(())
 }
+
+// to do -> parser le job
+// split si num proc >
