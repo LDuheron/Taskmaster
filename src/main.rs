@@ -31,24 +31,23 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-fn _parse_client_cmd(raw: String) -> Result<String> {
+fn _parse_client_cmd(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
-		let index = cmd.find(":");
-		if index.is_some() {
-			// TODO!
-			// let mut split_cmd = 
-			Ok(cmd.to_string())
-		}
-		else {
-			Ok(cmd.to_string())			
-		}
+        let index = cmd.find(":");
+        if index.is_some() {
+            // TODO!
+            // let mut split_cmd =
+            Ok(cmd.to_string())
+        } else {
+            Ok(cmd.to_string())
+        }
     } else {
         Err(Error::FieldCommandIsNotSet)
     }
 }
 
-fn _parse_client_arg(raw: String) -> Result<String> {
-	if let Some(cmd) = raw.split_whitespace().skip(1).next() {
+fn _parse_client_arg(raw: &String) -> Result<String> {
+    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         Ok(cmd.to_string())
     } else {
         Err(Error::FieldCommandIsNotSet) // repondre au client + new errror
@@ -74,27 +73,42 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // do something with the message from the client
                 // and return a message
                 // is it a fatal error ?
-                let client_cmd = _parse_client_cmd(formatted.clone());
-				let client_arg =_parse_client_arg(formatted); // ref if let
-				// TODO 
-				// let client_target_process: _parse_client_process(formatted);
+                let client_cmd = _parse_client_cmd(&formatted);
+                let client_arg = _parse_client_arg(&formatted);
+                // TODO
+                // let client_target_process: _parse_client_process(formatted);
                 match client_cmd {
                     Ok(cmd) if cmd == "start" => {
                         println!("start");
                         println!("{:?}", client_arg);
-						config.get_mut(&String::from("open_terminal")).unwrap().start(&String::from("open_terminal")); // error 
+                        // if client_arg.is_ok() {
+						// 	let string:String = client_arg?;
+                        //     config
+                        //         .get_mut()
+                        //         .unwrap()
+                        //         .start(&String::from(client_arg)); // error
+                        // }
+						config
+						.get_mut(&String::from("open_terminal"))
+						.unwrap()
+						.start(&String::from("open_terminal")); // error
                     }
-					Ok(cmd) if cmd == "stop" => {
+                    Ok(cmd) if cmd == "stop" => {
                         println!("stop");
+                        if client_arg.is_ok() {
+                            config
+                                .get_mut(&String::from("open_terminal"))
+                                .unwrap()
+                                .stop(&String::from("open_terminal")); // error
+                        }
                     }
-					Ok(cmd) if cmd == "restart" => {
+                    Ok(cmd) if cmd == "restart" => {
                         println!("restart");
                     }
-					Ok(_) => todo!(),
-					Err(e) => {
-						println!("Error: {}", e);
-					}
-
+                    Ok(_) => todo!(),
+                    Err(e) => {
+                        println!("Error: {}", e);
+                    }
                 }
 
                 s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
@@ -136,6 +150,5 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-
-// to do -> parser le job 
-// split si num proc > 
+// to do -> parser le job
+// split si num proc >

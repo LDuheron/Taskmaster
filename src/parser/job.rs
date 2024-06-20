@@ -123,8 +123,10 @@ impl Job {
 
             // TODO : modifier le if pour cibler le process[i]
             if self.processes.is_some() {
-                println!("Process is already running.");
-                continue;
+				if self.processes.is_some_and(Some(self.processes).is_empty()) {
+               		println!("Process is already running.");
+                	continue;
+				}
             }
 
             if let Some(args) = &self.arguments {
@@ -216,21 +218,26 @@ impl Job {
     pub fn stop(self: &mut Self, job_name: &String) {
         println!("log: stop {}", job_name);
 
-        // if let Some(ref mut map) = &self.processes {
-        //     if let Some(child) = map.get(&0) {
-        //         println!("Process is running.");
-        //         let mut child_id: u32 = child.id();
-        //         if let Some(mut signal) = self.stop_signal {
-        //             unsafe {
-        //                 kill(child_id, signal);
-        //             }
-        //         }
-        // 		else {
-        // 			unsafe {
-        //                 kill(child_id, SIGTERM);
-        //             }
-        // 		}
-        //     }
-        // }
+        if let Some(ref mut map) = self.processes {
+            if let Some(child) = map.get_mut(&0) {
+                println!("Process is running.");
+                child.kill();
+				map.remove(&0);
+				
+				
+				// let mut child_id: u32 = child.id();
+				
+                // if let Some(mut signal) = self.stop_signal {
+                //     unsafe {
+                //         kill(child_id, signal);
+                //     }
+                // }
+        		// else {
+        		// 	unsafe {
+                //         kill(child_id, SIGTERM);
+                //     }
+        		// }
+            }
+        }
     }
 }

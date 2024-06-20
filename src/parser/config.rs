@@ -23,9 +23,9 @@ impl Config {
         }
     }
 
-	pub fn get_mut(&mut self, key: &String) -> Option<&mut Job> {
-		self.map.get_mut(key)
-	}
+    pub fn get_mut(&mut self, key: &String) -> Option<&mut Job> {
+        self.map.get_mut(key)
+    }
 
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut old_config: Config = self.clone();
