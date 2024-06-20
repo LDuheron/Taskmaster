@@ -31,7 +31,7 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-fn _parse_client_cmd(raw: &String) -> Result<String> {
+fn parse_client_cmd(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
         let index = cmd.find(":");
         if index.is_some() {
@@ -46,7 +46,7 @@ fn _parse_client_cmd(raw: &String) -> Result<String> {
     }
 }
 
-fn _parse_client_arg(raw: &String) -> Result<String> {
+fn parse_client_arg(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         Ok(cmd.to_string())
     } else {
@@ -71,10 +71,10 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 }
                 let formatted = String::from_utf8_lossy(&data[..bytes_read]).into_owned();
                 println!("read: {}", formatted);
-                let client_cmd = _parse_client_cmd(&formatted);
-                let client_arg = _parse_client_arg(&formatted);
+                let client_cmd = parse_client_cmd(&formatted);
+                let client_arg = parse_client_arg(&formatted);
                 // TODO
-                // let client_target_process: _parse_client_process(formatted);
+                // let client_target_process: parse_client_process(&client_arg);
                 match client_cmd {
                     Ok(cmd) if cmd == "start" => {
                         config

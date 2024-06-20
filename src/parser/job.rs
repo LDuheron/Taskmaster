@@ -183,8 +183,6 @@ impl std::cmp::PartialEq for Job {
 impl Job {
     // TODO: specify the process number
     pub fn start(self: &mut Self, job_name: &String) {
-        println!("log: start {}", job_name);
-
         for i in 0..self.num_procs {
             let process: &mut ProcessInfo = &mut self.processes[i as usize];
             // something like that to avoid overriding process
@@ -193,8 +191,6 @@ impl Job {
                 return;
             }
             let mut command = Command::new(&self.command);
-
-            // TODO : modifier le if pour cibler le process[i]
             if let Some(args) = &self.arguments {
                 command.args(args);
             }
@@ -285,8 +281,8 @@ impl Job {
         }
         println!("log: stop {}", job_name);
         let _ = process.child.as_mut().unwrap().kill();
-        process.child = None;
         self.processes[0].set_state(ProcessStates::Stopping);
+        println!("LOG: {job_name}:0 is now in STOPPING state");
     }
 
     // from http://supervisord.org/subprocess.html#process-states
@@ -333,7 +329,12 @@ impl Job {
         let process: &mut ProcessInfo = &mut self.processes[process_index];
         if self.auto_restart != AutorestartOptions::Never && process.nb_retries < self.start_retries
         {
-            self._restart_process(process_index, job_name);
+            if (process.state_changed_at.elapsed().as_secs() as u32) < process.nb_retries {
+                return;
+            }
+            // TODO: specify the process number here
+            process.nb_retries += 1;
+            self.start(job_name);
             return;
         }
         process.nb_retries = 0;
@@ -402,32 +403,16 @@ impl Job {
             Ok(Some(status)) => {
                 // is safe: process can't be in exited state and terminated by signal
                 let code: i32 = status.code().unwrap();
-                let nb_retry_is_ok: bool = process.nb_retries < self.start_retries;
-                if self.auto_restart == AutorestartOptions::Always && nb_retry_is_ok {
-                    self._restart_process(process_index, job_name);
-                    return;
-                }
-                if self.auto_restart == AutorestartOptions::UnexpectedExit
-                    && self.exit_codes.contains(&code) == true
-                    && nb_retry_is_ok
+                if self.auto_restart == AutorestartOptions::Always
+                    || (self.auto_restart == AutorestartOptions::UnexpectedExit
+                        && self.exit_codes.contains(&code) == true)
                 {
-                    self._restart_process(process_index, job_name);
-                    return;
+                    // TODO: add process_index
+                    self.start(job_name);
                 }
             }
             Err(e) => eprintln!("Error attempting to wait: {e}"),
             Ok(None) => panic!("Why process state is EXITED but process is not TERMINATED ????"),
         }
-    }
-
-    fn _restart_process(&mut self, process_index: usize, job_name: &String) {
-        let process: &mut ProcessInfo = &mut self.processes[process_index];
-        // wait beetween restarts like supervisord (one sec * nb retry)
-        if (process.state_changed_at.elapsed().as_secs() as u32) < process.nb_retries {
-            return;
-        }
-        // TODO: specify the process number here
-        process.nb_retries += 1;
-        self.start(job_name);
     }
 }
