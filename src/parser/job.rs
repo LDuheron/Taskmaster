@@ -1,4 +1,4 @@
-// use libc::{kill, SIGTERM};
+
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -221,6 +221,7 @@ impl Job {
         if let Some(ref mut map) = self.processes {
             if let Some(child) = map.get_mut(&0) {
                 println!("Process is running.");
+				// Functional version version
                 child.kill();
 				map.remove(&0);
 				
@@ -237,6 +238,7 @@ impl Job {
                 //         kill(child_id, SIGTERM);
                 //     }
         		// }
+				// map.remove(&0);
             }
         }
     }
