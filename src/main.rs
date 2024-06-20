@@ -36,7 +36,7 @@ fn _parse_client_cmd(raw: &String) -> Result<String> {
         let index = cmd.find(":");
         if index.is_some() {
             // TODO!          // let mut split_cmd =
-  
+
             Ok(cmd.to_string())
         } else {
             Ok(cmd.to_string())
@@ -81,22 +81,30 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                     Ok(cmd) if cmd == "start" => {
                         println!("start");
                         println!("{:?}", client_arg);
-						config
-						.get_mut(&String::from("open_terminal"))
-						.unwrap()
-						.start(&String::from("open_terminal")); // error
+                        if let Ok(arg) = client_arg {
+                            config
+                                .get_mut(&String::from(&arg))
+                                .unwrap()
+                                .start(&String::from(&arg));
+                        }
                     }
                     Ok(cmd) if cmd == "stop" => {
                         println!("stop");
-                        if client_arg.is_ok() {
+                        if let Ok(arg) = client_arg {
                             config
-                                .get_mut(&String::from("open_terminal"))
+                                .get_mut(&String::from(&arg))
                                 .unwrap()
-                                .stop(&String::from("open_terminal")); // error
+                                .stop(&String::from(&arg));
                         }
                     }
                     Ok(cmd) if cmd == "restart" => {
                         println!("restart");
+                        if let Ok(arg) = client_arg {
+                            config
+                                .get_mut(&String::from(&arg))
+                                .unwrap()
+                                .restart(&String::from(&arg)); // error
+                        }
                     }
                     Ok(_) => todo!(),
                     Err(e) => {
