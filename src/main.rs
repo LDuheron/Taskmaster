@@ -31,16 +31,11 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
+///// client input pasing
+
 fn _parse_client_cmd(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
-        let index = cmd.find(":");
-        if index.is_some() {
-            // TODO!          // let mut split_cmd =
-
-            Ok(cmd.to_string())
-        } else {
-            Ok(cmd.to_string())
-        }
+        Ok(cmd.to_string())
     } else {
         Err(Error::FieldCommandIsNotSet)
     }
@@ -48,11 +43,41 @@ fn _parse_client_cmd(raw: &String) -> Result<String> {
 
 fn _parse_client_arg(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        Ok(cmd.to_string())
+        let index = cmd.find(":");
+        if index.is_some() {
+            let split_cmd = &cmd[0..index.unwrap()];
+            println!("{:?}", split_cmd.to_string());
+            Ok(split_cmd.to_string())
+        } else {
+            println!("{:?}", cmd.to_string());
+            Ok(cmd.to_string())
+        }
     } else {
-        Err(Error::FieldCommandIsNotSet) // repondre au client + new errror
+        Err(Error::FieldCommandIsNotSet) // repondre au client + new error
     }
 }
+
+fn _parse_client_process(raw: &String) -> Result<Option<String>> {
+    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
+        if let Some(index) = cmd.find(":") {
+            let split_cmd = &cmd[index..].to_string();
+            Ok(Some(split_cmd.to_string()))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Err(Error::FieldCommandIsNotSet) // repondre au client + new error
+    }
+}
+
+fn parse_client_input(raw: &String) -> Result<(String, String, Option<String>)> {
+    let client_cmd = _parse_client_cmd(&raw)?;
+    let client_arg = _parse_client_arg(&raw)?;
+    let client_process = _parse_client_process(&raw)?;
+    Ok((client_cmd, client_arg, client_process))
+}
+
+///// End parsing client input
 
 fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &String) -> Result<()> {
     let duration = std::time::Duration::from_millis(100);
@@ -73,45 +98,18 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // do something with the message from the client
                 // and return a message
                 // is it a fatal error ?
-                let client_cmd = _parse_client_cmd(&formatted);
-                let client_arg = _parse_client_arg(&formatted);
-                // TODO
-                // let client_target_process: _parse_client_process(formatted);
-                match client_cmd {
-                    Ok(cmd) if cmd == "start" => {
-                        println!("start");
-                        println!("{:?}", client_arg);
-                        if let Ok(arg) = client_arg {
-                            config
-                                .get_mut(&String::from(&arg))
-                                .unwrap()
-                                .start(&String::from(&arg));
-                        }
+
+                match parse_client_input(&formatted) {
+                    Ok((client_cmd, client_arg, client_process)) => {
+                        println!("client cmd : {:?}", client_cmd);
+                        println!("client arg : {:?}", client_arg);
+                        println!("client process : {:?}\n", client_process);
                     }
-                    Ok(cmd) if cmd == "stop" => {
-                        println!("stop");
-                        if let Ok(arg) = client_arg {
-                            config
-                                .get_mut(&String::from(&arg))
-                                .unwrap()
-                                .stop(&String::from(&arg));
-                        }
-                    }
-                    Ok(cmd) if cmd == "restart" => {
-                        println!("restart");
-                        if let Ok(arg) = client_arg {
-                            config
-                                .get_mut(&String::from(&arg))
-                                .unwrap()
-                                .restart(&String::from(&arg)); // error
-                        }
-                    }
-                    Ok(_) => {continue;}
                     Err(e) => {
-                        println!("Error: {}", e);
+                        eprintln!("{:?}", e);
+                        continue;
                     }
                 }
-
                 s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -122,6 +120,41 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
     }
     Ok(())
 }
+
+// cmd if cmd == "start" => {
+// 	println!("start");
+// 	println!("{:?}", client_arg);
+// 	if let Ok(arg) = client_arg {
+// 		config
+// 			.get_mut(&String::from(&arg))
+// 			.unwrap()
+// 			.start(&String::from(&arg));
+// 	}
+// }
+// Ok(cmd) if cmd == "stop" => {
+// 	println!("stop");
+// 	// if let Ok(arg) = client_arg {
+// 	//     config
+// 	//         .get_mut(&String::from(&arg))
+// 	//         .unwrap()
+// 	//         .stop(&String::from(&arg));
+// 	// }
+// }
+// Ok(cmd) if cmd == "restart" => {
+// 	println!("restart");
+// 	// if let Ok(arg) = client_arg {
+// 	//     config
+// 	//         .get_mut(&String::from(&arg))
+// 	//         .unwrap()
+// 	//         .restart(&String::from(&arg));
+// 	// }
+// }
+// Ok(_) => {
+// 	continue;
+// }
+// Err(e) => {
+// 	println!("Error: {}", e);
+// }
 
 fn init_connection(ip: String, port: String) -> Result<TcpListener> {
     let listener =

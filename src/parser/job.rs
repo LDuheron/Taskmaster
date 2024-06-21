@@ -25,6 +25,7 @@ pub enum StopSignals {
 
 #[derive(Debug)]
 pub struct Job {
+    pub name: String,
     pub command: String,
     pub arguments: Option<Vec<String>>,
     pub num_procs: u32,
@@ -47,6 +48,7 @@ pub struct Job {
 impl Default for Job {
     fn default() -> Self {
         Job {
+            name: String::new(),
             command: String::new(),
             arguments: None,
             num_procs: 1,
@@ -71,6 +73,7 @@ impl Default for Job {
 impl Clone for Job {
     fn clone(&self) -> Job {
         Job {
+            name: self.name.clone(),
             command: self.command.clone(),
             arguments: self.arguments.clone(),
             num_procs: self.num_procs,
@@ -93,7 +96,8 @@ impl Clone for Job {
 
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
-        self.command == other.command
+        self.name == other.name
+            && self.command == other.command
             && self.arguments == other.arguments
             && self.num_procs == other.num_procs
             && self.auto_start == other.auto_start
@@ -214,7 +218,7 @@ impl Job {
             if let Some(child) = map.get_mut(&0) {
                 println!("Process is running.");
                 // Functional version version
-                child.kill();
+                let _ = child.kill();
                 map.remove(&0);
 
                 // let mut child_id: u32 = child.id();
@@ -234,3 +238,7 @@ impl Job {
         }
     }
 }
+
+// TODO
+// tester si le job appartient ou non a la hashmap<>
+//
