@@ -358,7 +358,7 @@ impl Config {
 
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
         Ok(Job {
-            name: "open_terminal".to_string(),
+            // name: "open_terminal".to_string(),
             command: Self::_parse_command(&raw)?,
             arguments: Self::_parse_arguments(&raw)?,
             num_procs: Self::_parse_num_procs(&raw)?,

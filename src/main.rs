@@ -31,7 +31,7 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-///// client input pasing
+///// Start parsing client input 
 
 fn _parse_client_cmd(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
@@ -98,12 +98,41 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // do something with the message from the client
                 // and return a message
                 // is it a fatal error ?
-
                 match parse_client_input(&formatted) {
                     Ok((client_cmd, client_arg, client_process)) => {
                         println!("client cmd : {:?}", client_cmd);
                         println!("client arg : {:?}", client_arg);
                         println!("client process : {:?}\n", client_process);
+						// match client_cmd {
+						// 	cmd if cmd == "start" => {
+						// 		println!("start");
+						// 		println!("{:?}", client_arg);
+						// 		if let Ok(arg) = client_arg {
+						// 			config
+						// 				.get_mut(&String::from(&arg))
+						// 				.unwrap()
+						// 				.start(&String::from(&arg));
+						// 		}
+						// 	}
+						// 	cmd if cmd == "stop" => {
+						// 		println!("stop");
+						// 		// if let Ok(arg) = client_arg {
+						// 		//     config
+						// 		//         .get_mut(&String::from(&arg))
+						// 		//         .unwrap()
+						// 		//         .stop(&String::from(&arg));
+						// 		// }
+						// 	}
+						// 	cmd if cmd == "restart" => {
+						// 		println!("restart");
+						// 		// if let Ok(arg) = client_arg {
+						// 		//     config
+						// 		//         .get_mut(&String::from(&arg))
+						// 		//         .unwrap()
+						// 		//         .restart(&String::from(&arg));
+						// 		// }
+						// 	}
+						// }
                     }
                     Err(e) => {
                         eprintln!("{:?}", e);
@@ -120,41 +149,6 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
     }
     Ok(())
 }
-
-// cmd if cmd == "start" => {
-// 	println!("start");
-// 	println!("{:?}", client_arg);
-// 	if let Ok(arg) = client_arg {
-// 		config
-// 			.get_mut(&String::from(&arg))
-// 			.unwrap()
-// 			.start(&String::from(&arg));
-// 	}
-// }
-// Ok(cmd) if cmd == "stop" => {
-// 	println!("stop");
-// 	// if let Ok(arg) = client_arg {
-// 	//     config
-// 	//         .get_mut(&String::from(&arg))
-// 	//         .unwrap()
-// 	//         .stop(&String::from(&arg));
-// 	// }
-// }
-// Ok(cmd) if cmd == "restart" => {
-// 	println!("restart");
-// 	// if let Ok(arg) = client_arg {
-// 	//     config
-// 	//         .get_mut(&String::from(&arg))
-// 	//         .unwrap()
-// 	//         .restart(&String::from(&arg));
-// 	// }
-// }
-// Ok(_) => {
-// 	continue;
-// }
-// Err(e) => {
-// 	println!("Error: {}", e);
-// }
 
 fn init_connection(ip: String, port: String) -> Result<TcpListener> {
     let listener =
@@ -186,3 +180,4 @@ fn main() -> Result<()> {
 
 // to do -> parser le job
 // split si num proc >
+// checker si la command est dans la hash map
