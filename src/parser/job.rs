@@ -123,7 +123,13 @@ impl Job {
         if let Some(nb) = target_process {
             if nb <= self.num_procs {
                 start_index = nb;
-                end_index = nb;
+                end_index = nb + 1;
+            } else {
+                eprintln!(
+                    "Target index must be inferior or equal to {:?}",
+                    self.num_procs
+                );
+                return;
             }
         }
 

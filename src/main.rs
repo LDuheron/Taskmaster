@@ -60,12 +60,15 @@ fn _parse_client_arg(raw: &String) -> Result<String> {
 fn _parse_client_process(raw: &String, client_arg: &String) -> Result<Option<u32>> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         if let Some(index) = cmd.find(":") {
-            let split_cmd = &cmd[index..];
-
-            if let Some(split_index) = split_cmd.find("_") {
-                let (arg, num_proc_str) = split_cmd.split_at(split_index);
+            let split_cmd = &cmd[index + 1..];
+			println!("{:?}", split_cmd);
+            if let Some(last_split_index) = split_cmd.rfind("_") {
+                let (arg, num_proc_str) = split_cmd.split_at(last_split_index);
+				let mut number_str = &num_proc_str[1..];
+				println!("{:?}", arg);
+				println!("{:?}", number_str);
                 if arg == *client_arg {
-                    if let Ok(number) = num_proc_str[1..].parse::<u32>() {
+                    if let Ok(number) = number_str.parse::<u32>() {
                         return Ok(Some(number));
                     }
                 }
