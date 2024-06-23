@@ -93,7 +93,7 @@ impl Clone for Job {
 
 impl std::cmp::PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
-  		self.command == other.command
+        self.command == other.command
             && self.arguments == other.arguments
             && self.num_procs == other.num_procs
             && self.auto_start == other.auto_start
