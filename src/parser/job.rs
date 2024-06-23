@@ -114,8 +114,13 @@ impl std::cmp::PartialEq for Job {
 }
 
 impl Job {
-    pub fn start(self: &mut Self, job_name: &String) {
+    pub fn start(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: start {}", job_name);
+
+        let mut index = self.num_procs;
+        if let Some(nb) = target_process {
+            index = nb;
+        }
 
         for i in 0..self.num_procs {
             let mut command = Command::new(&self.command);
@@ -201,10 +206,10 @@ impl Job {
         }
     }
 
-    pub fn restart(self: &mut Self, job_name: &String) {
+    pub fn restart(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: restart {}", job_name);
         self.stop(job_name);
-        self.start(job_name);
+        self.start(job_name, target_process);
     }
 
     pub fn stop(self: &mut Self, job_name: &String) {

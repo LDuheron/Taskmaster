@@ -52,7 +52,7 @@ impl Config {
                 // new job case
                 _ => {
                     if job.auto_start {
-                        job.start(&job_name);
+                        job.start(&job_name, None); ////////////////// set None as target process for compilation error
                     }
                     continue;
                 }
@@ -60,7 +60,7 @@ impl Config {
             // job is changed case
             if job != old_job {
                 // TODO: check if the job is running and handle this
-                old_job.start(&job_name);
+                old_job.start(&job_name, None); ////////////////////// set None as target process for compilation error
                 // if old_job.is_running {
                 //     old_job.stop(&job_name);
                 //     job.start(&job_name);
@@ -110,7 +110,7 @@ impl Config {
             let job_name: &String = entry.0;
             let job: &mut Job = entry.1;
             if job.auto_start {
-                job.start(job_name);
+                job.start(job_name, None);
             }
         }
         Ok(())

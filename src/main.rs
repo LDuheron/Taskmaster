@@ -57,17 +57,22 @@ fn _parse_client_arg(raw: &String) -> Result<String> {
     }
 }
 
-fn _parse_client_process(raw: &String) -> Result<Option<String>> {
+fn _parse_client_process(raw: &String, client_arg: &String) -> Result<Option<u32>> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         if let Some(index) = cmd.find(":") {
-            let split_cmd = &cmd[index..].to_string();
-            Ok(Some(split_cmd.to_string()))
-        } else {
-            Ok(None)
+            let split_cmd = &cmd[index..];
+
+            if let Some(split_index) = split_cmd.find("_") {
+                let (arg, num_proc_str) = split_cmd.split_at(split_index);
+                if arg == *client_arg {
+                    if let Ok(number) = num_proc_str[1..].parse::<u32>() {
+                        return Ok(Some(number));
+                    }
+                }
+            }
         }
-    } else {
-        Err(Error::FieldCommandIsNotSet) // repondre au client + new error
     }
+    Ok(None)
 }
 
 fn is_job(config: &mut Config, cmd: &str) -> bool {
@@ -81,13 +86,10 @@ fn is_job(config: &mut Config, cmd: &str) -> bool {
     return false;
 }
 
-fn parse_client_input(
-    config: &mut Config,
-    raw: &String,
-) -> Result<(String, String, Option<String>)> {
+fn parse_client_input(config: &mut Config, raw: &String) -> Result<(String, String, Option<u32>)> {
     let client_cmd = _parse_client_cmd(&raw)?;
     let client_arg = _parse_client_arg(&raw)?;
-    let client_process = _parse_client_process(&raw)?;
+    let client_process = _parse_client_process(&raw, &client_arg)?;
     if is_job(config, &client_arg) {
         Ok((client_cmd, client_arg, client_process))
     } else {
@@ -122,17 +124,24 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                         println!("client arg : {:?}", client_arg); //
                         println!("client process : {:?}\n", client_process); //
 
+                        // pass the target process as parameter of the start stop restart functions
                         match client_cmd.as_str() {
                             "start" => {
-                                config.get_mut(&client_arg).unwrap().start(&client_arg);
-                            },
+                                config
+                                    .get_mut(&client_arg)
+                                    .unwrap()
+                                    .start(&client_arg, client_process);
+                            }
                             "stop" => {
                                 config.get_mut(&client_arg).unwrap().stop(&client_arg);
-                            },
+                            }
                             "restart" => {
-                                config.get_mut(&client_arg).unwrap().restart(&client_arg);
-                            },
-							_ => eprintln!("Unknown command: Please try start, stop or restart")
+                                config
+                                    .get_mut(&client_arg)
+                                    .unwrap()
+                                    .restart(&client_arg, client_process);
+                            }
+                            _ => eprintln!("Unknown command: Please try start, stop or restart"),
                         }
                     }
                     Err(e) => {
@@ -178,6 +187,3 @@ fn main() -> Result<()> {
     server_routine(&listener, &mut config, &config_file)?;
     Ok(())
 }
-
-// to do -> parser le job
-// split si num proc >
