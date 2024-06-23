@@ -121,7 +121,7 @@ impl Job {
         let mut start_index = 0;
         let mut end_index = self.num_procs;
         if let Some(nb) = target_process {
-            if nb <= self.num_procs {
+            if nb < self.num_procs {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
@@ -219,33 +219,56 @@ impl Job {
 
     pub fn restart(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: restart {}", job_name);
-        self.stop(job_name);
+        self.stop(job_name, None);
         self.start(job_name, target_process);
     }
 
-    pub fn stop(self: &mut Self, job_name: &String) {
+    pub fn stop(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: stop {}", job_name);
 
-        if let Some(ref mut map) = self.processes {
-            if let Some(child) = map.get_mut(&0) {
-                println!("Process is running.");
-                // Functional version version
-                let _ = child.kill();
-                map.remove(&0);
+        let mut start_index = 0;
+        let mut end_index = self.num_procs;
+        if let Some(nb) = target_process {
+            if nb < self.num_procs {
+                start_index = nb;
+                end_index = nb + 1;
+            } else {
+                eprintln!(
+                    "Target index must be inferior or equal to {:?}",
+                    self.num_procs
+                );
+                return;
+            }
+        }
 
-                // let mut child_id: u32 = child.id();
+     
+            if let Some(ref mut map) = self.processes {
+				for i in start_index..end_index {
+                if let Some(mut child) = map.remove(&i) {
+                    println!("Process is running.");
+                    // Functional version
+                    match child.kill() {
+					
+						Ok(_) => {println!("Process is dead."); }
+						Err(e) => {eprint!("{:?}", e)}
+					}
 
-                // if let Some(mut signal) = self.stop_signal {
-                //     unsafe {
-                //         kill(child_id, signal);
-                //     }
-                // }
-                // else {
-                // 	unsafe {
-                //         kill(child_id, SIGTERM);
-                //     }
-                // }
-                // map.remove(&0);
+        
+
+                    // let mut child_id: u32 = child.id();
+
+                    // if let Some(mut signal) = self.stop_signal {
+                    //     unsafe {
+                    //         kill(child_id, signal);
+                    //     }
+                    // }
+                    // else {
+                    // 	unsafe {
+                    //         kill(child_id, SIGTERM);
+                    //     }
+                    // }
+                    // map.remove(&0);
+                }
             }
         }
     }

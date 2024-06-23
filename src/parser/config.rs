@@ -74,7 +74,7 @@ impl Config {
         for entry in old_config.map.iter_mut() {
             let old_job_name: String = entry.0.into();
             let old_job: &mut Job = entry.1;
-            old_job.stop(&old_job_name);
+            old_job.stop(&old_job_name, None);
         }
         Ok(())
     }

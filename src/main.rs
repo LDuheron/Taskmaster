@@ -63,7 +63,7 @@ fn _parse_client_process(raw: &String, client_arg: &String) -> Result<Option<u32
             let split_cmd = &cmd[index + 1..];
             if let Some(last_split_index) = split_cmd.rfind("_") {
                 let (arg, num_proc_str) = split_cmd.split_at(last_split_index);
-				let num_proc_str = &num_proc_str[1..];
+                let num_proc_str = &num_proc_str[1..];
                 if arg == *client_arg {
                     if let Ok(number) = num_proc_str.parse::<u32>() {
                         return Ok(Some(number));
@@ -124,7 +124,6 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                         println!("client arg : {:?}", client_arg); //
                         println!("client process : {:?}\n", client_process); //
 
-                        // pass the target process as parameter of the start stop restart functions
                         match client_cmd.as_str() {
                             "start" => {
                                 config
@@ -133,7 +132,10 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                                     .start(&client_arg, client_process);
                             }
                             "stop" => {
-                                config.get_mut(&client_arg).unwrap().stop(&client_arg);
+                                config
+                                    .get_mut(&client_arg)
+                                    .unwrap()
+                                    .stop(&client_arg, client_process);
                             }
                             "restart" => {
                                 config
