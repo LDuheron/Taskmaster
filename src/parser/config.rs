@@ -61,12 +61,12 @@ impl Config {
             if job != old_job {
                 // TODO: check if the job is running and handle this
                 old_job.start(&job_name, None); ////////////////////// set None as target process for compilation error
-                // if old_job.is_running {
-                //     old_job.stop(&job_name);
-                //     job.start(&job_name);
-                // } else if job.auto_start {
-                //     job.start(&job_name);
-                // }
+                                                // if old_job.is_running {
+                                                //     old_job.stop(&job_name);
+                                                //     job.start(&job_name);
+                                                // } else if job.auto_start {
+                                                //     job.start(&job_name);
+                                                // }
             }
             old_config.map.remove_entry(&job_name);
         }

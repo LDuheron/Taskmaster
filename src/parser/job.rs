@@ -86,7 +86,8 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
-            processes: None, // TODO
+            // TODO
+            processes: None,
         }
     }
 }
@@ -117,12 +118,16 @@ impl Job {
     pub fn start(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: start {}", job_name);
 
-        let mut index = self.num_procs;
+        let mut start_index = 0;
+        let mut end_index = self.num_procs;
         if let Some(nb) = target_process {
-            index = nb;
+            if nb <= self.num_procs {
+                start_index = nb;
+                end_index = nb;
+            }
         }
 
-        for i in 0..self.num_procs {
+        for i in start_index..end_index {
             let mut command = Command::new(&self.command);
 
             // TODO : modifier le if pour cibler le process[i]
