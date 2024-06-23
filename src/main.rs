@@ -31,7 +31,9 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-///// Start parsing client input 
+
+
+///// Start parsing client input
 
 fn _parse_client_cmd(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
@@ -70,14 +72,35 @@ fn _parse_client_process(raw: &String) -> Result<Option<String>> {
     }
 }
 
-fn parse_client_input(raw: &String) -> Result<(String, String, Option<String>)> {
+fn is_job(config: &mut Config, cmd: &str) -> bool {
+    let keys = config.get_all_keys();
+    for key in keys {
+        println!("{}", key);
+        if key == cmd {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn parse_client_input(
+    config: &mut Config,
+    raw: &String,
+) -> Result<(String, String, Option<String>)> {
     let client_cmd = _parse_client_cmd(&raw)?;
     let client_arg = _parse_client_arg(&raw)?;
     let client_process = _parse_client_process(&raw)?;
-    Ok((client_cmd, client_arg, client_process))
+    if is_job(config, &client_arg) {
+        Ok((client_cmd, client_arg, client_process))
+    } else {
+        Err(Error::FieldCommandIsNotSet) ///// Mettre une erreur appropriee
+    }
 }
 
 ///// End parsing client input
+
+
+
 
 fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &String) -> Result<()> {
     let duration = std::time::Duration::from_millis(100);
@@ -98,41 +121,42 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // do something with the message from the client
                 // and return a message
                 // is it a fatal error ?
-                match parse_client_input(&formatted) {
+                match parse_client_input(config, &formatted) {
                     Ok((client_cmd, client_arg, client_process)) => {
                         println!("client cmd : {:?}", client_cmd);
                         println!("client arg : {:?}", client_arg);
                         println!("client process : {:?}\n", client_process);
-						// match client_cmd {
-						// 	cmd if cmd == "start" => {
-						// 		println!("start");
-						// 		println!("{:?}", client_arg);
-						// 		if let Ok(arg) = client_arg {
-						// 			config
-						// 				.get_mut(&String::from(&arg))
-						// 				.unwrap()
-						// 				.start(&String::from(&arg));
-						// 		}
-						// 	}
-						// 	cmd if cmd == "stop" => {
-						// 		println!("stop");
-						// 		// if let Ok(arg) = client_arg {
-						// 		//     config
-						// 		//         .get_mut(&String::from(&arg))
-						// 		//         .unwrap()
-						// 		//         .stop(&String::from(&arg));
-						// 		// }
-						// 	}
-						// 	cmd if cmd == "restart" => {
-						// 		println!("restart");
-						// 		// if let Ok(arg) = client_arg {
-						// 		//     config
-						// 		//         .get_mut(&String::from(&arg))
-						// 		//         .unwrap()
-						// 		//         .restart(&String::from(&arg));
-						// 		// }
-						// 	}
-						// }
+                        // checker si larg appartient a la liste de job possibles du fichier de config
+                        // match client_cmd {
+                        // 	cmd if cmd == "start" => {
+                        // 		println!("start");
+                        // 		println!("{:?}", client_arg);
+                        // 		if let Ok(arg) = client_arg {
+                        // 			config
+                        // 				.get_mut(&String::from(&arg))
+                        // 				.unwrap()
+                        // 				.start(&String::from(&arg));
+                        // 		}
+                        // 	}
+                        // 	cmd if cmd == "stop" => {
+                        // 		println!("stop");
+                        // 		// if let Ok(arg) = client_arg {
+                        // 		//     config
+                        // 		//         .get_mut(&String::from(&arg))
+                        // 		//         .unwrap()
+                        // 		//         .stop(&String::from(&arg));
+                        // 		// }
+                        // 	}
+                        // 	cmd if cmd == "restart" => {
+                        // 		println!("restart");
+                        // 		// if let Ok(arg) = client_arg {
+                        // 		//     config
+                        // 		//         .get_mut(&String::from(&arg))
+                        // 		//         .unwrap()
+                        // 		//         .restart(&String::from(&arg));
+                        // 		// }
+                        // 	}
+                        // }
                     }
                     Err(e) => {
                         eprintln!("{:?}", e);
@@ -180,4 +204,3 @@ fn main() -> Result<()> {
 
 // to do -> parser le job
 // split si num proc >
-// checker si la command est dans la hash map

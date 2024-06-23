@@ -27,6 +27,10 @@ impl Config {
         self.map.get_mut(key)
     }
 
+    pub fn get_all_keys(&self) -> Vec<String> {
+        self.map.keys().cloned().collect()
+    }
+
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut old_config: Config = self.clone();
         self.map.clear();
@@ -358,7 +362,6 @@ impl Config {
 
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
         Ok(Job {
-            // name: "open_terminal".to_string(),
             command: Self::_parse_command(&raw)?,
             arguments: Self::_parse_arguments(&raw)?,
             num_procs: Self::_parse_num_procs(&raw)?,
