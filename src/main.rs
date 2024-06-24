@@ -114,32 +114,30 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // do something with the message from the client
                 // and return a message
                 // is it a fatal error ?
-                match parse_client_input(config, &formatted) {
-                    Ok((client_cmd, client_arg, client_process)) =>
-						match client_cmd.as_str() {
-                        "start" => {
-                            config
-                                .get_mut(&client_arg)
-                                .unwrap()
-                                .start(&client_arg, client_process);
-                        }
-                        "stop" => {
-                            config
-                                .get_mut(&client_arg)
-                                .unwrap()
-                                .stop(&client_arg, client_process);
-                        }
-                        "restart" => {
-                            config
-                                .get_mut(&client_arg)
-                                .unwrap()
-                                .restart(&client_arg, client_process);
-                        }
-                        _ => eprintln!("Unknown command: Please try start, stop or restart"),
-                    },
-                    Err(e) => {
-                        eprintln!("{:?}", e);
+                let (client_cmd, client_arg, client_process) =
+                    if let Ok((client_cmd, client_arg, client_process)) =
+                        parse_client_input(config, &formatted)
+                    {
+                        (client_cmd, client_arg, client_process)
+                    } else {
+                        s.write(b"Error while parsing the input!")
+                            .map_err(|e| Error::IO(e.to_string()))?;
                         continue;
+                    };
+                let job: &mut parser::job::Job = config.get_mut(&client_arg).unwrap();
+                match client_cmd.as_str() {
+                    "start" => {
+                        job.start(&client_arg, client_process);
+                    }
+                    "stop" => {
+                        job.stop(&client_arg, client_process);
+                    }
+                    "restart" => {
+                        job.restart(&client_arg, client_process);
+                    }
+                    _ => {
+                        s.write(b"Unknown command: Please try start, stop or restart")
+                            .map_err(|e| Error::IO(e.to_string()))?;
                     }
                 }
                 s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
