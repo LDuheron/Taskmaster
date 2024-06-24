@@ -33,7 +33,7 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
 
 ///// Start parsing client input
 
-fn _parse_client_cmd(raw: &String) -> Result<String> {
+fn parse_cmd_from_client_input(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
         Ok(cmd.to_string())
     } else {
@@ -41,7 +41,7 @@ fn _parse_client_cmd(raw: &String) -> Result<String> {
 	}
 }
 
-fn _parse_client_arg(raw: &String) -> Result<String> {
+fn parse_arg_from_client_input(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         let index = cmd.find(":");
         if index.is_some() {
@@ -57,7 +57,7 @@ fn _parse_client_arg(raw: &String) -> Result<String> {
     }
 }
 
-fn _parse_client_process(raw: &String, client_arg: &String) -> Result<Option<u32>> {
+fn parse_target_process_from_client_input(raw: &String, client_arg: &String) -> Result<Option<u32>> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         if let Some(index) = cmd.find(":") {
             let split_cmd = &cmd[index + 1..];
@@ -75,7 +75,7 @@ fn _parse_client_process(raw: &String, client_arg: &String) -> Result<Option<u32
     Ok(None)
 }
 
-fn is_job(config: &mut Config, cmd: &str) -> bool {
+fn is_job_from_config_map(config: &mut Config, cmd: &str) -> bool {
     let keys = config.get_all_keys();
     for key in keys {
         println!("{}", key);
@@ -87,10 +87,10 @@ fn is_job(config: &mut Config, cmd: &str) -> bool {
 }
 
 fn parse_client_input(config: &mut Config, raw: &String) -> Result<(String, String, Option<u32>)> {
-    let client_cmd = _parse_client_cmd(&raw)?;
-    let client_arg = _parse_client_arg(&raw)?;
-    let client_process = _parse_client_process(&raw, &client_arg)?;
-    if is_job(config, &client_arg) {
+    let client_cmd = parse_cmd_from_client_input(&raw)?;
+    let client_arg = parse_arg_from_client_input(&raw)?;
+    let client_process = parse_target_process_from_client_input(&raw, &client_arg)?;
+    if is_job_from_config_map(config, &client_arg) {
         Ok((client_cmd, client_arg, client_process))
     } else {
         Err(Error::WrongClientInputFormat)
