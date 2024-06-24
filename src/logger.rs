@@ -1,10 +1,9 @@
 use std::fs::OpenOptions;
 use std::io::Write;
-
 use std::sync::{Mutex, Once};
-// Once ensures that the global variable is only initialized once
 
 static START: Once = Once::new();
+static mut LOGGER: Option<Mutex<Logger>> = None;
 
 pub struct Logger {
     pub log_file: Option<std::fs::File>,
@@ -18,26 +17,28 @@ impl Default for Logger {
 
 impl Logger {
     pub fn init_log() {
-		START.call_once(|| {
-			
-		});
-	}
+        START.call_once(|| {
+            let logger = Logger::default();
 
-    pub fn new(self: &mut Self) {
-        match OpenOptions::new()
-            .create(true)
-            .write(true)
-            .append(true)
-            .open("log.txt")
-        {
-            Ok(file) => {
-                self.log_file = Some(file);
+            match OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open("log.txt")
+            {
+                Ok(file) => {
+                    logger.log_file = Some(file);
+                }
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                    return;
+                }
             }
-            Err(e) => {
-                eprintln!("Error: {:?}", e);
-                return;
+
+            unsafe {
+                Logger = Some(Mutex::new(logger));
             }
-        }
+        });
     }
 
     pub fn log_event(self: &mut Self, text: &String) {
@@ -45,8 +46,9 @@ impl Logger {
             let data: &[u8] = text.as_bytes();
             let _ = file.write(data);
         } else {
-            eprintln!(Error::NoLogFile);
+            eprintln!("Error: No log file");
             return;
+            //    Err(Error::NoLogFile)
         }
     }
 }
