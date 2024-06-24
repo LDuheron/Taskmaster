@@ -27,6 +27,10 @@ impl Config {
         self.map.get_mut(key)
     }
 
+    pub fn contains_key(&mut self, key: &String) -> bool {
+        self.map.contains_key(key)
+    }
+
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut old_config: Config = self.clone();
         self.map.clear();
@@ -48,7 +52,7 @@ impl Config {
                 // new job case
                 _ => {
                     if job.auto_start {
-                        job.start(&job_name);
+                        job.start(&job_name, None); // TODO ! set None as target process for compilation error
                     }
                     continue;
                 }
@@ -56,13 +60,12 @@ impl Config {
             // job is changed case
             if job != old_job {
                 // TODO: check if the job is running and handle this
-                old_job.start(&job_name);
-                // if old_job.is_running {
-                //     old_job.stop(&job_name);
-                //     job.start(&job_name);
-                // } else if job.auto_start {
-                //     job.start(&job_name);
-                // }
+                old_job.start(&job_name, None); // TODO ! set None as target process for compilation error
+                                                //     old_job.stop(&job_name);
+                                                //     job.start(&job_name);
+                                                // } else if job.auto_start {
+                                                //     job.start(&job_name);
+                                                // }
             }
             old_config.map.remove_entry(&job_name);
         }
@@ -70,7 +73,7 @@ impl Config {
         for entry in old_config.map.iter_mut() {
             let old_job_name: String = entry.0.into();
             let old_job: &mut Job = entry.1;
-            old_job.stop(&old_job_name);
+            old_job.stop(&old_job_name, None); // TODO ! set None as target process for compilation error
         }
         Ok(())
     }
@@ -106,7 +109,7 @@ impl Config {
             let job_name: &String = entry.0;
             let job: &mut Job = entry.1;
             if job.auto_start {
-                job.start(job_name);
+                job.start(job_name, None); // TODO ! set None as target process for compilation error
             }
         }
         Ok(())

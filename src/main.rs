@@ -31,26 +31,67 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-fn _parse_client_cmd(raw: &String) -> Result<String> {
+fn parse_cmd_from_client_input(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
-        let index = cmd.find(":");
-        if index.is_some() {
-            // TODO!          // let mut split_cmd =
-  
-            Ok(cmd.to_string())
-        } else {
-            Ok(cmd.to_string())
-        }
+        Ok(cmd.to_string())
     } else {
-        Err(Error::FieldCommandIsNotSet)
+        Err(Error::WrongClientInputFormat)
     }
 }
 
-fn _parse_client_arg(raw: &String) -> Result<String> {
+fn parse_arg_from_client_input(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        Ok(cmd.to_string())
+        let index = cmd.rfind(":");
+        if index.is_some() {
+            let split_cmd = &cmd[0..index.unwrap()];
+            println!("{:?}", split_cmd.to_string());
+            Ok(split_cmd.to_string())
+        } else {
+            println!("{:?}", cmd.to_string());
+            Ok(cmd.to_string())
+        }
     } else {
-        Err(Error::FieldCommandIsNotSet) // repondre au client + new errror
+        Err(Error::WrongClientInputFormat) // repondre au client
+    }
+}
+
+fn parse_target_process_number_from_client_input(
+    raw: &String,
+    client_arg: &String,
+) -> Result<Option<u32>> {
+    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
+        if let Some(index) = cmd.find(":") {
+            let split_cmd = &cmd[index + 1..];
+            if let Some(last_split_index) = split_cmd.rfind("_") {
+                let (arg, num_proc_str) = split_cmd.split_at(last_split_index);
+                let num_proc_str = &num_proc_str[1..];
+                if arg == *client_arg {
+                    if let Ok(number) = num_proc_str.parse::<u32>() {
+                        return Ok(Some(number));
+                    }
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn is_job_from_config_map(config: &mut Config, cmd: &String) -> bool {
+    let result = config.contains_key(cmd);
+    if result == true {
+        return true;
+    }
+    return false;
+}
+
+fn parse_client_input(config: &mut Config, raw: &String) -> Result<(String, String, Option<u32>)> {
+    let client_cmd = parse_cmd_from_client_input(&raw)?;
+    let client_arg = parse_arg_from_client_input(&raw)?;
+    let client_process = parse_target_process_number_from_client_input(&raw, &client_arg)?;
+    if is_job_from_config_map(config, &client_arg) {
+        Ok((client_cmd, client_arg, client_process))
+    } else {
+        Err(Error::WrongClientInputFormat)
     }
 }
 
@@ -73,37 +114,32 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // do something with the message from the client
                 // and return a message
                 // is it a fatal error ?
-                let client_cmd = _parse_client_cmd(&formatted);
-                let client_arg = _parse_client_arg(&formatted);
-                // TODO
-                // let client_target_process: _parse_client_process(formatted);
-                match client_cmd {
-                    Ok(cmd) if cmd == "start" => {
-                        println!("start");
-                        println!("{:?}", client_arg);
-						config
-						.get_mut(&String::from("open_terminal"))
-						.unwrap()
-						.start(&String::from("open_terminal")); // error
+                let (client_cmd, client_arg, client_process) =
+                    if let Ok((client_cmd, client_arg, client_process)) =
+                        parse_client_input(config, &formatted)
+                    {
+                        (client_cmd, client_arg, client_process)
+                    } else {
+                        s.write(b"Error while parsing the input!")
+                            .map_err(|e| Error::IO(e.to_string()))?;
+                        continue;
+                    };
+                let job: &mut parser::job::Job = config.get_mut(&client_arg).unwrap();
+                match client_cmd.as_str() {
+                    "start" => {
+                        job.start(&client_arg, client_process);
                     }
-                    Ok(cmd) if cmd == "stop" => {
-                        println!("stop");
-                        if client_arg.is_ok() {
-                            config
-                                .get_mut(&String::from("open_terminal"))
-                                .unwrap()
-                                .stop(&String::from("open_terminal")); // error
-                        }
+                    "stop" => {
+                        job.stop(&client_arg, client_process);
                     }
-                    Ok(cmd) if cmd == "restart" => {
-                        println!("restart");
+                    "restart" => {
+                        job.restart(&client_arg, client_process);
                     }
-                    Ok(_) => todo!(),
-                    Err(e) => {
-                        println!("Error: {}", e);
+                    _ => {
+                        s.write(b"Unknown command: Please try start, stop or restart")
+                            .map_err(|e| Error::IO(e.to_string()))?;
                     }
                 }
-
                 s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -142,6 +178,3 @@ fn main() -> Result<()> {
     server_routine(&listener, &mut config, &config_file)?;
     Ok(())
 }
-
-// to do -> parser le job
-// split si num proc >

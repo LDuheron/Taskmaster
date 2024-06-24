@@ -86,7 +86,8 @@ impl Clone for Job {
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
             umask: self.umask.clone(),
-            processes: None, // TODO
+            // TODO
+            processes: None,
         }
     }
 }
@@ -114,10 +115,25 @@ impl std::cmp::PartialEq for Job {
 }
 
 impl Job {
-    pub fn start(self: &mut Self, job_name: &String) {
+    pub fn start(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: start {}", job_name);
 
-        for i in 0..self.num_procs {
+        let mut start_index = 0;
+        let mut end_index = self.num_procs;
+        if let Some(nb) = target_process {
+            if nb < self.num_procs {
+                start_index = nb;
+                end_index = nb + 1;
+            } else {
+                eprintln!(
+                    "Target index must be inferior or equal to {:?}",
+                    self.num_procs
+                );
+                return;
+            }
+        }
+
+        for i in start_index..end_index {
             let mut command = Command::new(&self.command);
 
             // TODO : modifier le if pour cibler le process[i]
@@ -187,6 +203,7 @@ impl Job {
                 Ok(child_process) => {
                     if let Some(ref mut map) = self.processes {
                         map.insert(i, child_process);
+                        println!();
                     } else {
                         // TODO : modify to the new vector
                         let mut map: HashMap<u32, Child> = HashMap::new();
@@ -201,35 +218,58 @@ impl Job {
         }
     }
 
-    pub fn restart(self: &mut Self, job_name: &String) {
+    pub fn restart(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: restart {}", job_name);
-        self.stop(job_name);
-        self.start(job_name);
+        self.stop(job_name, target_process);
+        self.start(job_name, target_process);
     }
 
-    pub fn stop(self: &mut Self, job_name: &String) {
+    pub fn stop(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: stop {}", job_name);
 
+        let mut start_index = 0;
+        let mut end_index = self.num_procs;
+        if let Some(nb) = target_process {
+            if nb < self.num_procs {
+                start_index = nb;
+                end_index = nb + 1;
+            } else {
+                eprintln!(
+                    "Target index must be inferior or equal to {:?}",
+                    self.num_procs
+                );
+                return;
+            }
+        }
+
         if let Some(ref mut map) = self.processes {
-            if let Some(child) = map.get_mut(&0) {
-                println!("Process is running.");
-                // Functional version version
-                child.kill();
-                map.remove(&0);
+            for i in start_index..end_index {
+                if let Some(mut child) = map.remove(&i) {
+                    println!("Process is running.");
+                    // Functional version
+                    match child.kill() {
+                        Ok(_) => {
+                            println!("Process is dead.");
+                        }
+                        Err(e) => {
+                            eprint!("{:?}", e)
+                        }
+                    }
 
-                // let mut child_id: u32 = child.id();
+                    // let mut child_id: u32 = child.id();
 
-                // if let Some(mut signal) = self.stop_signal {
-                //     unsafe {
-                //         kill(child_id, signal);
-                //     }
-                // }
-                // else {
-                // 	unsafe {
-                //         kill(child_id, SIGTERM);
-                //     }
-                // }
-                // map.remove(&0);
+                    // if let Some(mut signal) = self.stop_signal {
+                    //     unsafe {
+                    //         kill(child_id, signal);
+                    //     }
+                    // }
+                    // else {
+                    // 	unsafe {
+                    //         kill(child_id, SIGTERM);
+                    //     }
+                    // }
+                    // map.remove(&0);
+                }
             }
         }
     }
