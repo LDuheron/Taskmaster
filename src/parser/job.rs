@@ -241,19 +241,19 @@ impl Job {
             }
         }
 
-     
-            if let Some(ref mut map) = self.processes {
-				for i in start_index..end_index {
+        if let Some(ref mut map) = self.processes {
+            for i in start_index..end_index {
                 if let Some(mut child) = map.remove(&i) {
                     println!("Process is running.");
                     // Functional version
                     match child.kill() {
-					
-						Ok(_) => {println!("Process is dead."); }
-						Err(e) => {eprint!("{:?}", e)}
-					}
-
-        
+                        Ok(_) => {
+                            println!("Process is dead.");
+                        }
+                        Err(e) => {
+                            eprint!("{:?}", e)
+                        }
+                    }
 
                     // let mut child_id: u32 = child.id();
 
