@@ -37,8 +37,8 @@ fn _parse_client_cmd(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
         Ok(cmd.to_string())
     } else {
-        Err(Error::FieldCommandIsNotSet)
-    }
+        Err(Error::WrongClientInputFormat)
+	}
 }
 
 fn _parse_client_arg(raw: &String) -> Result<String> {
@@ -53,7 +53,7 @@ fn _parse_client_arg(raw: &String) -> Result<String> {
             Ok(cmd.to_string())
         }
     } else {
-        Err(Error::FieldCommandIsNotSet) // repondre au client + new error
+        Err(Error::WrongClientInputFormat) // repondre au client + new error
     }
 }
 
@@ -93,7 +93,7 @@ fn parse_client_input(config: &mut Config, raw: &String) -> Result<(String, Stri
     if is_job(config, &client_arg) {
         Ok((client_cmd, client_arg, client_process))
     } else {
-        Err(Error::FieldCommandIsNotSet) ///// Mettre une erreur appropriee
+        Err(Error::WrongClientInputFormat)
     }
 }
 
@@ -120,10 +120,6 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // is it a fatal error ?
                 match parse_client_input(config, &formatted) {
                     Ok((client_cmd, client_arg, client_process)) => {
-                        println!("client cmd : {:?}", client_cmd); //
-                        println!("client arg : {:?}", client_arg); //
-                        println!("client process : {:?}\n", client_process); //
-
                         match client_cmd.as_str() {
                             "start" => {
                                 config
