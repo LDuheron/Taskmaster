@@ -6,7 +6,7 @@ import sys
 import os
 
 
-HOST = 'localhost'
+HOST = '192.168.0.34'
 PORT = 4241
 
 # This function allows reading stdin in raw mode (meaning, without expecting the '\n' to transmit the data)

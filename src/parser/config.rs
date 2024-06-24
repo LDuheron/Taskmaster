@@ -23,10 +23,6 @@ impl Config {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Job)> {
-        self.map.iter()
-    }
-
     pub fn jobs_routine(&mut self) {
         for (job_name, job) in self.map.iter_mut() {
             job.processes_routine(job_name);
@@ -35,6 +31,10 @@ impl Config {
 
     pub fn get_mut(&mut self, key: &String) -> Option<&mut Job> {
         self.map.get_mut(key)
+    }
+
+    pub fn contains_key(&mut self, key: &String) -> bool {
+        self.map.contains_key(key)
     }
 
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
@@ -56,7 +56,7 @@ impl Config {
                 // new job case
                 _ => {
                     if job.auto_start {
-                        job.start(&job_name);
+                        job.start(&job_name, None); // TODO ! set None as target process for compilation error
                     }
                     continue;
                 }
@@ -64,8 +64,8 @@ impl Config {
             // job is changed case
             if job != old_job {
                 // TODO: check if the job is running and handle this
-                old_job.start(&job_name);
-                // if old_job.is_running {
+                old_job.start(&job_name, None);
+                // TODO ! set None as target process for compilation error
                 //     old_job.stop(&job_name);
                 //     job.start(&job_name);
                 // } else if job.auto_start {
@@ -76,7 +76,7 @@ impl Config {
         }
         // job is not present in new config file
         for (old_job_name, old_job) in old_config.map.iter_mut() {
-            old_job.stop(&old_job_name);
+            old_job.stop(&old_job_name, None);
         }
         Ok(())
     }
@@ -112,7 +112,7 @@ impl Config {
             let job_name: &String = entry.0;
             let job: &mut Job = entry.1;
             if job.auto_start {
-                job.start(job_name);
+                job.start(job_name, None); // TODO ! set None as target process for compilation error
             }
         }
         Ok(())

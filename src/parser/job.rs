@@ -181,14 +181,26 @@ impl std::cmp::PartialEq for Job {
 }
 
 impl Job {
-    // TODO: specify the process number
-    pub fn start(self: &mut Self, job_name: &String) {
-        for i in 0..self.num_procs {
-            let process: &mut ProcessInfo = &mut self.processes[i as usize];
-            // something like that to avoid overriding process
-            if process.can_start() == false {
-                eprintln!("Process can't be started");
+    pub fn start(self: &mut Self, job_name: &String, target_process: Option<usize>) {
+        let mut start_index: usize = 0;
+        let mut end_index: usize = self.num_procs as usize;
+        if let Some(nb) = target_process {
+            if nb < self.num_procs as usize {
+                start_index = nb;
+                end_index = nb + 1;
+            } else {
+                eprintln!(
+                    "Target index must be inferior or equal to {:?}",
+                    self.num_procs
+                );
                 return;
+            }
+        }
+
+        for i in start_index..end_index {
+            if self.processes[i].can_start() == false {
+                eprintln!("{job_name} is in a state where it can't start");
+                continue;
             }
             let mut command = Command::new(&self.command);
             if let Some(args) = &self.arguments {
@@ -255,8 +267,8 @@ impl Job {
 
             match command.spawn() {
                 Ok(child_process) => {
-                    process.child = Some(child_process);
-                    process.set_state(ProcessStates::Starting);
+                    self.processes[i as usize].child = Some(child_process);
+                    self.processes[i as usize].set_state(ProcessStates::Starting);
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);
@@ -265,24 +277,51 @@ impl Job {
         }
     }
 
-    pub fn restart(self: &mut Self, job_name: &String) {
+    pub fn restart(self: &mut Self, job_name: &String, target_process: Option<usize>) {
         println!("log: restart {}", job_name);
-        self.stop(job_name);
-        self.start(job_name);
+        self.stop(job_name, target_process);
+        self.start(job_name, target_process);
     }
 
-    // TODO: stop if state is starting or running
-    pub fn stop(self: &mut Self, job_name: &String) {
-        // TODO: change the index
-        let process: &mut ProcessInfo = &mut self.processes[0];
-        if process.can_stop() == false {
-            eprintln!("Process can't be started");
-            return;
+    pub fn stop(self: &mut Self, job_name: &String, target_process: Option<usize>) {
+        let mut start_index: usize = 0;
+        let mut end_index: usize = self.num_procs as usize;
+        if let Some(nb) = target_process {
+            if nb < self.num_procs as usize {
+                start_index = nb;
+                end_index = nb + 1;
+            } else {
+                eprintln!(
+                    "Target index must be inferior or equal to {:?}",
+                    self.num_procs
+                );
+                return;
+            }
         }
-        println!("log: stop {}", job_name);
-        let _ = process.child.as_mut().unwrap().kill();
-        self.processes[0].set_state(ProcessStates::Stopping);
-        println!("LOG: {job_name}:0 is now in STOPPING state");
+        for i in start_index..end_index {
+            let process: &mut ProcessInfo = &mut self.processes[i as usize];
+            if process.can_stop() == false {
+                eprintln!("{job_name} is in a state where it can't stop");
+                continue;
+            }
+            let _ = process.child.as_mut().unwrap().kill();
+            self.processes[0].set_state(ProcessStates::Stopping);
+            println!("LOG: {job_name}:{i} is now in STOPPING state");
+
+            // let mut child_id: u32 = child.id();
+
+            // if let Some(mut signal) = self.stop_signal {
+            //     unsafe {
+            //         kill(child_id, signal);
+            //     }
+            // }
+            // else {
+            // 	unsafe {
+            //         kill(child_id, SIGTERM);
+            //     }
+            // }
+            // map.remove(&0);
+        }
     }
 
     // from http://supervisord.org/subprocess.html#process-states
@@ -332,9 +371,8 @@ impl Job {
             if (process.state_changed_at.elapsed().as_secs() as u32) < process.nb_retries {
                 return;
             }
-            // TODO: specify the process number here
             process.nb_retries += 1;
-            self.start(job_name);
+            self.start(job_name, Some(process_index));
             return;
         }
         process.nb_retries = 0;
@@ -408,11 +446,13 @@ impl Job {
                         && self.exit_codes.contains(&code) == true)
                 {
                     // TODO: add process_index
-                    self.start(job_name);
+                    self.start(job_name, Some(process_index));
                 }
             }
             Err(e) => eprintln!("Error attempting to wait: {e}"),
-            Ok(None) => panic!("Why process state is EXITED but process is not TERMINATED ????"),
+            Ok(None) => {
+                panic!("Why process state is EXITED but process is not TERMINATED ????")
+            }
         }
     }
 }
