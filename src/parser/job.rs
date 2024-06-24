@@ -203,6 +203,7 @@ impl Job {
                 Ok(child_process) => {
                     if let Some(ref mut map) = self.processes {
                         map.insert(i, child_process);
+						println!();
                     } else {
                         // TODO : modify to the new vector
                         let mut map: HashMap<u32, Child> = HashMap::new();

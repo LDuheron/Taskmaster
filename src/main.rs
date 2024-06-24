@@ -53,7 +53,7 @@ fn _parse_client_arg(raw: &String) -> Result<String> {
             Ok(cmd.to_string())
         }
     } else {
-        Err(Error::WrongClientInputFormat) // repondre au client + new error
+        Err(Error::WrongClientInputFormat) // repondre au client
     }
 }
 
