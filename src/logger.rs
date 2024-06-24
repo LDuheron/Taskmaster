@@ -18,13 +18,13 @@ impl Default for Logger {
 impl Logger {
     pub fn init_log() {
         START.call_once(|| {
-            let logger = Logger::default();
+            let mut logger = Logger::default();
 
             match OpenOptions::new()
                 .create(true)
                 .write(true)
                 .append(true)
-                .open("log.txt")
+                .open("supervisor.log")
             {
                 Ok(file) => {
                     logger.log_file = Some(file);
@@ -36,19 +36,22 @@ impl Logger {
             }
 
             unsafe {
-                Logger = Some(Mutex::new(logger));
+                LOGGER = Some(Mutex::new(logger));
             }
         });
     }
 
     pub fn log_event(self: &mut Self, text: &String) {
-        if let Some(ref mut file) = self.log_file {
-            let data: &[u8] = text.as_bytes();
-            let _ = file.write(data);
-        } else {
-            eprintln!("Error: No log file");
-            return;
-            //    Err(Error::NoLogFile)
-        }
+		if let Some(lock) = LOGGER.lock().unwrap() {
+
+			if let Some(ref mut file) = self.log_file {
+				let data: &[u8] = text.as_bytes();
+				let _ = file.write(data);
+			} else {
+				eprintln!("Error: No log file");
+				return;
+				//    Err(Error::NoLogFile)
+			}
+		}
     }
 }
