@@ -27,8 +27,8 @@ impl Config {
         self.map.get_mut(key)
     }
 
-    pub fn get_all_keys(&self) -> Vec<String> {
-        self.map.keys().cloned().collect()
+    pub fn contains_key(&mut self, key: &String) -> bool {
+        self.map.contains_key(key)
     }
 
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {

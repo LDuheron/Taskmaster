@@ -20,7 +20,7 @@ pub enum Error {
         msg: String,
     },
     FieldCommandIsNotSet,
-	WrongClientInputFormat,
+    WrongClientInputFormat,
     CantParseEnvEntry(String),
     IO(String),
     Default(String),

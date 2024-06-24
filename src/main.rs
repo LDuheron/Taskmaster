@@ -38,12 +38,12 @@ fn parse_cmd_from_client_input(raw: &String) -> Result<String> {
         Ok(cmd.to_string())
     } else {
         Err(Error::WrongClientInputFormat)
-	}
+    }
 }
 
 fn parse_arg_from_client_input(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        let index = cmd.find(":");
+        let index = cmd.rfind(":");
         if index.is_some() {
             let split_cmd = &cmd[0..index.unwrap()];
             println!("{:?}", split_cmd.to_string());
@@ -57,7 +57,10 @@ fn parse_arg_from_client_input(raw: &String) -> Result<String> {
     }
 }
 
-fn parse_target_process_from_client_input(raw: &String, client_arg: &String) -> Result<Option<u32>> {
+fn parse_target_process_number_from_client_input(
+    raw: &String,
+    client_arg: &String,
+) -> Result<Option<u32>> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         if let Some(index) = cmd.find(":") {
             let split_cmd = &cmd[index + 1..];
@@ -75,13 +78,10 @@ fn parse_target_process_from_client_input(raw: &String, client_arg: &String) -> 
     Ok(None)
 }
 
-fn is_job_from_config_map(config: &mut Config, cmd: &str) -> bool {
-    let keys = config.get_all_keys();
-    for key in keys {
-        println!("{}", key);
-        if key == cmd {
-            return true;
-        }
+fn is_job_from_config_map(config: &mut Config, cmd: &String) -> bool {
+    let result = config.contains_key(cmd);
+    if result == true {
+        return true;
     }
     return false;
 }
@@ -89,7 +89,7 @@ fn is_job_from_config_map(config: &mut Config, cmd: &str) -> bool {
 fn parse_client_input(config: &mut Config, raw: &String) -> Result<(String, String, Option<u32>)> {
     let client_cmd = parse_cmd_from_client_input(&raw)?;
     let client_arg = parse_arg_from_client_input(&raw)?;
-    let client_process = parse_target_process_from_client_input(&raw, &client_arg)?;
+    let client_process = parse_target_process_number_from_client_input(&raw, &client_arg)?;
     if is_job_from_config_map(config, &client_arg) {
         Ok((client_cmd, client_arg, client_process))
     } else {
@@ -119,29 +119,27 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // and return a message
                 // is it a fatal error ?
                 match parse_client_input(config, &formatted) {
-                    Ok((client_cmd, client_arg, client_process)) => {
-                        match client_cmd.as_str() {
-                            "start" => {
-                                config
-                                    .get_mut(&client_arg)
-                                    .unwrap()
-                                    .start(&client_arg, client_process);
-                            }
-                            "stop" => {
-                                config
-                                    .get_mut(&client_arg)
-                                    .unwrap()
-                                    .stop(&client_arg, client_process);
-                            }
-                            "restart" => {
-                                config
-                                    .get_mut(&client_arg)
-                                    .unwrap()
-                                    .restart(&client_arg, client_process);
-                            }
-                            _ => eprintln!("Unknown command: Please try start, stop or restart"),
+                    Ok((client_cmd, client_arg, client_process)) => match client_cmd.as_str() {
+                        "start" => {
+                            config
+                                .get_mut(&client_arg)
+                                .unwrap()
+                                .start(&client_arg, client_process);
                         }
-                    }
+                        "stop" => {
+                            config
+                                .get_mut(&client_arg)
+                                .unwrap()
+                                .stop(&client_arg, client_process);
+                        }
+                        "restart" => {
+                            config
+                                .get_mut(&client_arg)
+                                .unwrap()
+                                .restart(&client_arg, client_process);
+                        }
+                        _ => eprintln!("Unknown command: Please try start, stop or restart"),
+                    },
                     Err(e) => {
                         eprintln!("{:?}", e);
                         continue;
