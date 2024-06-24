@@ -44,10 +44,8 @@ fn parse_arg_from_client_input(raw: &String) -> Result<String> {
         let index = cmd.rfind(":");
         if index.is_some() {
             let split_cmd = &cmd[0..index.unwrap()];
-            println!("{:?}", split_cmd.to_string());
             Ok(split_cmd.to_string())
         } else {
-            println!("{:?}", cmd.to_string());
             Ok(cmd.to_string())
         }
     } else {
@@ -115,9 +113,6 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 }
                 let formatted = String::from_utf8_lossy(&data[..bytes_read]).into_owned();
                 println!("read: {}", formatted);
-                // do something with the message from the client
-                // and return a message
-                // is it a fatal error ?
                 let (client_cmd, client_arg, client_process) =
                     if let Ok((client_cmd, client_arg, client_process)) =
                         parse_client_input(config, &formatted)
@@ -178,7 +173,7 @@ fn main() -> Result<()> {
     unsafe {
         signal(SIGHUP, handle_sighup as usize);
     }
-    let listener: TcpListener = init_connection("192.168.0.34".into(), "4241".into())?;
+    let listener: TcpListener = init_connection("localhost".into(), "4241".into())?;
     server_routine(&listener, &mut config, &config_file)?;
     Ok(())
 }

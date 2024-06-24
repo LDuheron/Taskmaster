@@ -133,7 +133,6 @@ impl Default for Job {
     }
 }
 
-// clone() seulement sur les types non primitifs donc deep copy
 impl Clone for Job {
     fn clone(&self) -> Job {
         Job {
@@ -175,8 +174,6 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
-        // TODO
-        // && self.processes == other.processes
     }
 }
 
@@ -269,6 +266,7 @@ impl Job {
                 Ok(child_process) => {
                     self.processes[i as usize].child = Some(child_process);
                     self.processes[i as usize].set_state(ProcessStates::Starting);
+                    println!("LOG: {job_name}:{i} is now in STARTING state");
                 }
                 Err(e) => {
                     eprintln!("Failed to start process: {:?}", e);
@@ -278,7 +276,7 @@ impl Job {
     }
 
     pub fn restart(self: &mut Self, job_name: &String, target_process: Option<usize>) {
-        println!("log: restart {}", job_name);
+        println!("LOG: restart {}", job_name);
         self.stop(job_name, target_process);
         self.start(job_name, target_process);
     }
@@ -445,7 +443,6 @@ impl Job {
                     || (self.auto_restart == AutorestartOptions::UnexpectedExit
                         && self.exit_codes.contains(&code) == true)
                 {
-                    // TODO: add process_index
                     self.start(job_name, Some(process_index));
                 }
             }

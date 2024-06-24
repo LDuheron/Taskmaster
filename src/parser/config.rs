@@ -1,5 +1,5 @@
 use super::job::{AutorestartOptions, Job, ProcessInfo, StopSignals};
-use crate::{Error, Result};
+use crate::{parser::job::ProcessStates, Error, Result};
 use configparser::ini::Ini;
 use std::collections::HashMap;
 
@@ -63,14 +63,22 @@ impl Config {
             };
             // job is changed case
             if job != old_job {
-                // TODO: check if the job is running and handle this
-                old_job.start(&job_name, None);
-                // TODO ! set None as target process for compilation error
-                //     old_job.stop(&job_name);
-                //     job.start(&job_name);
-                // } else if job.auto_start {
-                //     job.start(&job_name);
-                // }
+                // to run only the already started process
+                let mut job_is_running: bool = false;
+                for i in 0..old_job.processes.len() {
+                    let process: &ProcessInfo = &old_job.processes[i];
+                    if process.state != ProcessStates::Fatal
+                        && process.state != ProcessStates::Exited
+                        && process.state != ProcessStates::Stopped
+                    {
+                        old_job.stop(&job_name, Some(i));
+                        job.start(&job_name, Some(i));
+                        job_is_running = true;
+                    }
+                }
+                if job_is_running == false && job.auto_start == true {
+                    job.start(&job_name, None);
+                }
             }
             old_config.map.remove_entry(job_name);
         }
