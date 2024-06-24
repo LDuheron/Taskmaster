@@ -220,7 +220,7 @@ impl Job {
 
     pub fn restart(self: &mut Self, job_name: &String, target_process: Option<u32>) {
         println!("log: restart {}", job_name);
-        self.stop(job_name, None);
+        self.stop(job_name, target_process);
         self.start(job_name, target_process);
     }
 

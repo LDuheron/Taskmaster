@@ -31,8 +31,6 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-///// Start parsing client input
-
 fn parse_cmd_from_client_input(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
         Ok(cmd.to_string())
@@ -97,8 +95,6 @@ fn parse_client_input(config: &mut Config, raw: &String) -> Result<(String, Stri
     }
 }
 
-///// End parsing client input
-
 fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &String) -> Result<()> {
     let duration = std::time::Duration::from_millis(100);
     for stream in listener.incoming() {
@@ -119,7 +115,8 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 // and return a message
                 // is it a fatal error ?
                 match parse_client_input(config, &formatted) {
-                    Ok((client_cmd, client_arg, client_process)) => match client_cmd.as_str() {
+                    Ok((client_cmd, client_arg, client_process)) =>
+						match client_cmd.as_str() {
                         "start" => {
                             config
                                 .get_mut(&client_arg)
