@@ -64,13 +64,17 @@ impl Config {
             // job is changed case
             if job != old_job {
                 // to run only the already started process
+                println!("job is changed");
                 let mut job_is_running: bool = false;
-                for i in 0..old_job.processes.len() {
+                let old_job_number: usize = old_job.processes.len();
+                for i in 0..old_job_number {
                     let process: &ProcessInfo = &old_job.processes[i];
+                    println!("state: {:?}", process.state);
                     if process.state != ProcessStates::Fatal
                         && process.state != ProcessStates::Exited
                         && process.state != ProcessStates::Stopped
                     {
+                        println!("in");
                         old_job.stop(&job_name, Some(i));
                         job.start(&job_name, Some(i));
                         job_is_running = true;
@@ -443,19 +447,6 @@ mod tests {
             *job,
             Job {
                 command,
-                num_procs: 1,
-                auto_start: true,
-                auto_restart: AutorestartOptions::UnexpectedExit,
-                exit_codes: vec![1],
-                start_secs: 1,
-                start_retries: 3,
-                stop_signal: StopSignals::TERM,
-                stop_wait_secs: 10,
-                stderr_file: None,
-                stdout_file: None,
-                environment: None,
-                work_dir: None,
-                umask: None,
                 ..Default::default()
             },
         );
@@ -478,9 +469,9 @@ mod tests {
             Job {
                 command,
                 num_procs: 1,
-                auto_start: true,
+                auto_start: false,
                 auto_restart: AutorestartOptions::UnexpectedExit,
-                exit_codes: vec![1],
+                exit_codes: vec![0],
                 start_secs: 1,
                 start_retries: 3,
                 stop_signal: StopSignals::TERM,

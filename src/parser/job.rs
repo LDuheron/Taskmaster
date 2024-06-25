@@ -116,9 +116,9 @@ impl Default for Job {
             command: String::new(),
             arguments: None,
             num_procs: 1,
-            auto_start: true,
+            auto_start: false,
             auto_restart: AutorestartOptions::UnexpectedExit,
-            exit_codes: vec![1],
+            exit_codes: vec![0],
             start_secs: 1,
             start_retries: 3,
             stop_signal: StopSignals::TERM,
@@ -303,7 +303,7 @@ impl Job {
                 continue;
             }
             let _ = process.child.as_mut().unwrap().kill();
-            self.processes[0].set_state(ProcessStates::Stopping);
+            self.processes[i].set_state(ProcessStates::Stopping);
             println!("LOG: {job_name}:{i} is now in STOPPING state");
 
             // let mut child_id: u32 = child.id();
@@ -441,7 +441,7 @@ impl Job {
                 let code: i32 = status.code().unwrap();
                 if self.auto_restart == AutorestartOptions::Always
                     || (self.auto_restart == AutorestartOptions::UnexpectedExit
-                        && self.exit_codes.contains(&code) == true)
+                        && self.exit_codes.contains(&code) == false)
                 {
                     self.start(job_name, Some(process_index));
                 }
