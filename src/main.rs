@@ -59,7 +59,7 @@ fn parse_target_process_number_from_client_input(
     raw: &String
 ) -> Result<Option<u32>> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        if let Some(index) = cmd.find(":") {
+        if let Some(index) = cmd.rfind(":") {
             let split_cmd = &cmd[index + 1..];
             if let Ok(number) = split_cmd.parse::<u32>() {
                     return Ok(Some(number));        
