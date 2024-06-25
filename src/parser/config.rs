@@ -38,57 +38,39 @@ impl Config {
     }
 
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
-        let mut old_config: Config = self.clone();
-        self.map.clear();
-        let parsing_result = Self::parse_config_file(self, config_path);
-        if parsing_result.is_err() {
-            println!(
-                "log: cant reload the config: {:?}",
-                parsing_result.unwrap_err()
-            );
-            self.map = old_config.map;
-            return Ok(());
-        }
+        let mut new_config: Config = Config::new();
+        new_config.parse_config_file(config_path)?;
         println!("log: reload config with {}", config_path);
-        for (job_name, job) in self.map.iter_mut() {
-            let old_job: &mut Job = match old_config.map.get_mut(job_name) {
-                Some(j) => j,
+        for (job_name, new_job) in new_config.map.iter_mut() {
+            match self.map.get_mut(job_name) {
+                // job is changed case
+                Some(old_job) if old_job != new_job => {
+                    println!("job is changed");
+                    let _ = old_job.stop(&job_name, None);
+                    self.map.insert(job_name.clone(), new_job.clone());
+                    if new_job.auto_start {
+                        let job: &mut Job = self.get_mut(job_name).unwrap();
+                        job.start(job_name, None);
+                    }
+                }
+                // job is the same
+                Some(old_job) if old_job == new_job => continue,
                 // new job case
                 _ => {
-                    if job.auto_start {
-                        job.start(&job_name, None); // TODO ! set None as target process for compilation error
+                    self.map.insert(job_name.clone(), new_job.clone());
+                    if new_job.auto_start {
+                        let job: &mut Job = self.get_mut(job_name).unwrap();
+                        job.start(job_name, None);
                     }
                     continue;
                 }
             };
-            // job is changed case
-            if job != old_job {
-                // to run only the already started process
-                println!("job is changed");
-                let mut job_is_running: bool = false;
-                let old_job_number: usize = old_job.processes.len();
-                for i in 0..old_job_number {
-                    let process: &ProcessInfo = &old_job.processes[i];
-                    println!("state: {:?}", process.state);
-                    if process.state != ProcessStates::Fatal
-                        && process.state != ProcessStates::Exited
-                        && process.state != ProcessStates::Stopped
-                    {
-                        println!("in");
-                        old_job.stop(&job_name, Some(i));
-                        job.start(&job_name, Some(i));
-                        job_is_running = true;
-                    }
-                }
-                if job_is_running == false && job.auto_start == true {
-                    job.start(&job_name, None);
-                }
-            }
-            old_config.map.remove_entry(job_name);
         }
-        // job is not present in new config file
-        for (old_job_name, old_job) in old_config.map.iter_mut() {
-            old_job.stop(&old_job_name, None);
+        // yes this is horrible, idk how to improve this
+        for (job_name, _old_job) in self.map.clone().iter() {
+            if new_config.contains_key(job_name) == false {
+                self.map.remove(&job_name.clone());
+            }
         }
         Ok(())
     }

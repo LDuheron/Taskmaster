@@ -4,6 +4,8 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::Instant;
 
+use crate::error::{Error, Result};
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum AutorestartOptions {
     Always,
@@ -186,10 +188,7 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                eprintln!(
-                    "Target index must be inferior or equal to {:?}",
-                    self.num_procs
-                );
+                eprintln!("Target index must be inferior to {:?}", self.num_procs);
                 return;
             }
         }
@@ -275,13 +274,18 @@ impl Job {
         }
     }
 
-    pub fn restart(self: &mut Self, job_name: &String, target_process: Option<usize>) {
+    pub fn restart(
+        self: &mut Self,
+        job_name: &String,
+        target_process: Option<usize>,
+    ) -> Result<()> {
         println!("LOG: restart {}", job_name);
-        self.stop(job_name, target_process);
-        self.start(job_name, target_process);
+        self.stop(job_name, target_process)?;
+        self.start(job_name, target_process); // TODO: handle result
+        Ok(())
     }
 
-    pub fn stop(self: &mut Self, job_name: &String, target_process: Option<usize>) {
+    pub fn stop(self: &mut Self, job_name: &String, target_process: Option<usize>) -> Result<()> {
         let mut start_index: usize = 0;
         let mut end_index: usize = self.num_procs as usize;
         if let Some(nb) = target_process {
@@ -289,11 +293,9 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                eprintln!(
-                    "Target index must be inferior or equal to {:?}",
-                    self.num_procs
-                );
-                return;
+                return Err(Error::Default(
+                    "Target index must be inferior to {:?}".into(),
+                ));
             }
         }
         for i in start_index..end_index {
@@ -318,8 +320,8 @@ impl Job {
             //         kill(child_id, SIGTERM);
             //     }
             // }
-            // map.remove(&0);
         }
+        Ok(())
     }
 
     // from http://supervisord.org/subprocess.html#process-states
