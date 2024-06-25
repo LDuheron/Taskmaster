@@ -56,21 +56,17 @@ fn parse_arg_from_client_input(raw: &String) -> Result<String> {
 }
 
 fn parse_target_process_number_from_client_input(
-    raw: &String,
-    client_arg: &String,
+    raw: &String
 ) -> Result<Option<u32>> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         if let Some(index) = cmd.find(":") {
             let split_cmd = &cmd[index + 1..];
-            if let Some(last_split_index) = split_cmd.rfind("_") {
-                let (arg, num_proc_str) = split_cmd.split_at(last_split_index);
-                let num_proc_str = &num_proc_str[1..];
-                if arg == *client_arg {
-                    if let Ok(number) = num_proc_str.parse::<u32>() {
-                        return Ok(Some(number));
-                    }
-                }
+            if let Ok(number) = split_cmd.parse::<u32>() {
+                    return Ok(Some(number));        
             }
+			else {
+				return Err(Error::WrongClientInputFormat);
+			}
         }
     }
     Ok(None)
@@ -87,7 +83,7 @@ fn is_job_from_config_map(config: &mut Config, cmd: &String) -> bool {
 fn parse_client_input(config: &mut Config, raw: &String) -> Result<(String, String, Option<u32>)> {
     let client_cmd = parse_cmd_from_client_input(&raw)?;
     let client_arg = parse_arg_from_client_input(&raw)?;
-    let client_process = parse_target_process_number_from_client_input(&raw, &client_arg)?;
+    let client_process = parse_target_process_number_from_client_input(&raw)?;
     if is_job_from_config_map(config, &client_arg) {
         Ok((client_cmd, client_arg, client_process))
     } else {
