@@ -1,3 +1,4 @@
+use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::path::Path;
@@ -159,7 +160,7 @@ impl Clone for Job {
 }
 
 // this don't check for processes
-impl std::cmp::PartialEq for Job {
+impl PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
             && self.arguments == other.arguments
@@ -263,6 +264,7 @@ impl Job {
 
             match command.spawn() {
                 Ok(child_process) => {
+                    self.processes[i as usize].nb_retries += 1;
                     self.processes[i as usize].child = Some(child_process);
                     self.processes[i as usize].set_state(ProcessStates::Starting);
                     println!("LOG: {job_name}:{i} is now in STARTING state");
@@ -366,12 +368,10 @@ impl Job {
 
     fn _handle_backoff(&mut self, process_index: usize, job_name: &String) {
         let process: &mut ProcessInfo = &mut self.processes[process_index];
-        if self.auto_restart != AutorestartOptions::Never && process.nb_retries < self.start_retries
-        {
+        if process.nb_retries < self.start_retries {
             if (process.state_changed_at.elapsed().as_secs() as u32) < process.nb_retries {
                 return;
             }
-            process.nb_retries += 1;
             self.start(job_name, Some(process_index));
             return;
         }

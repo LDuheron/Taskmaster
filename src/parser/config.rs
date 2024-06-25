@@ -1,7 +1,7 @@
 use super::job::{AutorestartOptions, Job, ProcessInfo, StopSignals};
-use crate::{parser::job::ProcessStates, Error, Result};
+use crate::{Error, Result};
 use configparser::ini::Ini;
-use std::collections::HashMap;
+use std::{any::type_name, collections::HashMap, str::FromStr};
 
 pub type ConfigParserContent = HashMap<String, HashMap<String, Option<String>>>;
 pub type RawConfig = HashMap<String, Option<String>>;
@@ -116,7 +116,7 @@ impl Config {
     // -- PRIVATE
     //
 
-    fn _parse_raw_config_field<T: std::str::FromStr>(
+    fn _parse_raw_config_field<T: FromStr>(
         raw: &RawConfig,
         field_name: String,
         default: T,
@@ -125,7 +125,7 @@ impl Config {
             Some(Some(value)) => Ok(value.parse::<T>().map_err(|_| Error::CantParseField {
                 field_name,
                 value: value.to_string(),
-                type_name: std::any::type_name::<T>().into(),
+                type_name: type_name::<T>().into(),
             })?),
             _ => Ok(default),
         }
@@ -316,7 +316,7 @@ impl Config {
                     s.parse::<i32>().map_err(|_| Error::CantParseField {
                         field_name: field_name.clone(),
                         value: str.to_string(),
-                        type_name: std::any::type_name::<i32>().into(),
+                        type_name: type_name::<i32>().into(),
                     })
                 })
                 .collect(),

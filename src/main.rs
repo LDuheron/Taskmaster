@@ -3,8 +3,11 @@ mod parser;
 
 use error::{Error, Result};
 use parser::config::Config;
-use std::io::prelude::*;
+use std::env::args;
+use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
+use std::thread::sleep;
+use std::time::Duration;
 
 const SIGHUP: i32 = 1;
 static mut RELOAD_CONFIG: bool = false;
@@ -90,7 +93,7 @@ fn parse_client_input(
 }
 
 fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &String) -> Result<()> {
-    let duration = std::time::Duration::from_millis(100);
+    let duration = Duration::from_millis(100);
     for stream in listener.incoming() {
         try_reload_config(config, config_file);
         config.jobs_routine();
@@ -101,7 +104,7 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                     .read(&mut data)
                     .map_err(|e| Error::Default(e.to_string()))?;
                 if bytes_read == 0 {
-                    std::thread::sleep(duration);
+                    sleep(duration);
                     continue;
                 }
                 let formatted = String::from_utf8_lossy(&data[..bytes_read]).into_owned();
@@ -117,26 +120,32 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                         continue;
                     };
                 let job: &mut parser::job::Job = config.get_mut(&client_arg).unwrap();
+                let mut ret = Ok(());
                 match client_cmd.as_str() {
                     "start" => {
+                        // TODO: handle error for start
                         job.start(&client_arg, client_process);
                     }
                     "stop" => {
-                        job.stop(&client_arg, client_process);
+                        ret = job.stop(&client_arg, client_process);
                     }
                     "restart" => {
-                        job.restart(&client_arg, client_process);
+                        ret = job.restart(&client_arg, client_process);
                     }
                     _ => {
-                        s.write(b"Unknown command: Please try start, stop or restart")
-                            .map_err(|e| Error::IO(e.to_string()))?;
+                        ret = Err(Error::CommandIsNotSuported(
+                            "Unknown command: Please try start, stop or restart!".into(),
+                        ))
                     }
                 }
-                s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
+                if ret.is_err() {
+                    s.write(&ret.unwrap_err().to_string().into_bytes())
+                        .map_err(|e| Error::IO(e.to_string()))?;
+                } else {
+                    s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
+                }
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(duration)
-            }
+            Err(ref e) if e.kind() == ErrorKind::WouldBlock => sleep(duration),
             Err(e) => return Err(Error::IO(e.to_string())),
         }
     }
@@ -154,12 +163,12 @@ fn init_connection(ip: String, port: String) -> Result<TcpListener> {
 }
 
 fn main() -> Result<()> {
-    if std::env::args().len() != 2 {
+    if args().len() != 2 {
         return Err(Error::BadNumberOfArguments(String::from(
             "usage: taskmaster config_file",
         )));
     }
-    let config_file: String = std::env::args().nth(1).unwrap();
+    let config_file: String = args().nth(1).unwrap();
     let mut config: Config = Config::new();
     config.parse_config_file(&config_file)?;
     println!("{:#?}", config);
