@@ -3,12 +3,14 @@ mod logger;
 mod parser;
 
 use error::{Error, Result};
+use logger::Logger;
 use parser::config::Config;
 use std::io::prelude::*;
 use std::net::TcpListener;
 
 const SIGHUP: i32 = 1;
 static mut RELOAD_CONFIG: bool = false;
+static mut LOGGER: Logger = Logger::new();
 
 extern "C" {
     pub fn signal(signum: i32, handler: usize) -> u32;
@@ -77,6 +79,9 @@ fn main() -> Result<()> {
         return Err(Error::BadNumberOfArguments(String::from(
             "usage: taskmaster config_file",
         )));
+    }
+    unsafe {
+        LOGGER.init("log.txt")?;
     }
     let config_file: String = std::env::args().nth(1).unwrap();
     let mut config: Config = Config::new();

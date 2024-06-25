@@ -1,4 +1,5 @@
 use super::job::{AutorestartOptions, Job, StopSignals};
+use crate::logger::log;
 use crate::{Error, Result};
 use configparser::ini::Ini;
 use std::collections::HashMap;
@@ -18,6 +19,7 @@ impl Config {
     //
 
     pub fn new() -> Self {
+        log("this is a test");
         Config {
             map: HashMap::new(),
         }

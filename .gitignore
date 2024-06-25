@@ -3,3 +3,4 @@ target/
 *nfs*
 .vscode
 .vagrant
+log.txt

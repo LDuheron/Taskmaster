@@ -21,6 +21,7 @@ pub enum Error {
     },
     FieldCommandIsNotSet,
     CantParseEnvEntry(String),
+    CantOpenLogFile(String),
     IO(String),
     Default(String),
 }
