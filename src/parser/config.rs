@@ -25,6 +25,14 @@ impl Config {
         }
     }
 
+    pub fn get_mut(&mut self, key: &String) -> Option<&mut Job> {
+        self.map.get_mut(key)
+    }
+
+    pub fn contains_key(&mut self, key: &String) -> bool {
+        self.map.contains_key(key)
+    }
+
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut old_config: Config = self.clone();
         self.map.clear();
@@ -46,19 +54,20 @@ impl Config {
                 // new job case
                 _ => {
                     if job.auto_start {
-                        job.start(&job_name);
+                        job.start(&job_name, None); // TODO ! set None as target process for compilation error
                     }
                     continue;
                 }
             };
             // job is changed case
             if job != old_job {
-                if old_job.is_running {
-                    old_job.stop(&job_name);
-                    job.start(&job_name);
-                } else if job.auto_start {
-                    job.start(&job_name);
-                }
+                // TODO: check if the job is running and handle this
+                old_job.start(&job_name, None); // TODO ! set None as target process for compilation error
+                                                //     old_job.stop(&job_name);
+                                                //     job.start(&job_name);
+                                                // } else if job.auto_start {
+                                                //     job.start(&job_name);
+                                                // }
             }
             old_config.map.remove_entry(&job_name);
         }
@@ -66,7 +75,7 @@ impl Config {
         for entry in old_config.map.iter_mut() {
             let old_job_name: String = entry.0.into();
             let old_job: &mut Job = entry.1;
-            old_job.stop(&old_job_name);
+            old_job.stop(&old_job_name, None); // TODO ! set None as target process for compilation error
         }
         Ok(())
     }
@@ -102,7 +111,7 @@ impl Config {
             let job_name: &String = entry.0;
             let job: &mut Job = entry.1;
             if job.auto_start {
-                job.start(job_name);
+                job.start(job_name, None); // TODO ! set None as target process for compilation error
             }
         }
         Ok(())
@@ -148,6 +157,50 @@ impl Config {
                 }
             }
             _ => Ok(default),
+        }
+    }
+
+    fn _parse_command_line(raw: &RawConfig) -> Result<String> {
+        let file_name: Option<String> = Some(Self::_parse_raw_config_field(
+            raw,
+            "command".into(),
+            String::new(),
+        )?);
+        if let Some(cmd_as_str) = file_name {
+            Ok(cmd_as_str)
+        } else {
+            Err(Error::FieldCommandIsNotSet)
+        }
+    }
+
+    fn _parse_arguments(raw: &RawConfig) -> Result<Option<Vec<String>>> {
+        let cmd = Some(Self::_parse_command_line(raw)?);
+        if let Some(cmd_as_str) = cmd {
+            let args: Vec<String> = cmd_as_str
+                .split_whitespace()
+                .skip(1)
+                .map(String::from)
+                .collect();
+            if args.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(args))
+            }
+        } else {
+            Err(Error::FieldCommandIsNotSet)
+        }
+    }
+
+    fn _parse_command(raw: &RawConfig) -> Result<String> {
+        let string = Some(Self::_parse_command_line(raw)?);
+        if let Some(cmd_as_str) = string {
+            if let Some(cmd) = cmd_as_str.split_whitespace().next() {
+                Ok(cmd.to_string())
+            } else {
+                Err(Error::FieldCommandIsNotSet)
+            }
+        } else {
+            Err(Error::FieldCommandIsNotSet)
         }
     }
 
@@ -300,15 +353,6 @@ impl Config {
         )
     }
 
-    fn _parse_command(raw: &RawConfig) -> Result<String> {
-        let file_name: Option<String> = Self::_parse_one_word_field(&raw, "command".into(), None)?;
-        if file_name.is_none() {
-            Err(Error::FieldCommandIsNotSet)
-        } else {
-            Ok(file_name.unwrap())
-        }
-    }
-
     fn _parse_num_procs(raw: &RawConfig) -> Result<u32> {
         Self::_parse_raw_config_field::<u32>(
             raw,
@@ -320,6 +364,7 @@ impl Config {
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
         Ok(Job {
             command: Self::_parse_command(&raw)?,
+            arguments: Self::_parse_arguments(&raw)?,
             num_procs: Self::_parse_num_procs(&raw)?,
             auto_start: Self::_parse_autostart(&raw)?,
             auto_restart: Self::_parse_autorestart(&raw)?,
@@ -414,7 +459,7 @@ mod tests {
         let command: String = String::from("/bin/test");
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
-             command: {command}",
+             command= {command}",
         ));
         config.parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
@@ -446,7 +491,7 @@ mod tests {
     fn multiple_config_ok() -> Result<()> {
         let (config_parser, mut config) = get_config_parser_and_config(String::from(
             "[cat]
-        command: /bin/cat
+        command= /bin/cat
 
         [netcat]
         command=/bin/nc
@@ -528,6 +573,25 @@ mod tests {
             })
         );
         assert!(config.map.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn command_with_arguments() -> Result<()> {
+        let (config_parser, mut config) = get_config_parser_and_config(String::from(
+            "[test]
+             command = nc -nvlp 5555",
+        ));
+        config.parse_content_of_parserconfig(config_parser)?;
+        let job: &Job = config.map.get("test".into()).unwrap();
+        assert_eq!(
+            *job,
+            Job {
+                command: "nc".into(),
+                arguments: Some(vec!("-nvlp".into(), "5555".into())),
+                ..Default::default()
+            },
+        );
         Ok(())
     }
 
@@ -1018,7 +1082,8 @@ mod tests {
         let command: String = String::from("/bin/test");
         let (config_parser, mut config) = get_config_parser_and_config(format!(
             "[{job_name}]
-             command={command} umask=abc",
+             command={command}
+             umask=abc",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
