@@ -69,6 +69,7 @@ impl Config {
         // yes this is horrible, idk how to improve this
         for (job_name, _old_job) in self.map.clone().iter() {
             if new_config.contains_key(job_name) == false {
+                let _ = self.map.get_mut(job_name).unwrap().stop(job_name, None);
                 self.map.remove(&job_name.clone());
             }
         }

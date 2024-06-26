@@ -5,3 +5,4 @@ target/
 .vagrant
 err
 out
+a.out

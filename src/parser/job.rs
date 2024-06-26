@@ -7,6 +7,10 @@ use std::time::Instant;
 
 use crate::error::{Error, Result};
 
+extern "C" {
+    fn kill(pid: u32, signal: i32);
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum AutorestartOptions {
     Always,
@@ -272,7 +276,7 @@ impl Job {
                 Err(e) => return Err(Error::StartJobFail(e.to_string())),
             }
         }
-        Ok(format!("{job_name} is started successffully!"))
+        Ok(format!("{job_name} is started successfully!"))
     }
 
     pub fn restart(
@@ -283,7 +287,7 @@ impl Job {
         println!("LOG: restart {}", job_name);
         self.stop(job_name, target_process)?;
         self.start(job_name, target_process)?;
-        Ok(format!("{job_name} is restarted successffully!"))
+        Ok(format!("{job_name} is restarted successfully!"))
     }
 
     pub fn stop(
@@ -298,9 +302,10 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                return Err(Error::StopJobFail(
-                    "Target index must be inferior to {:?}".into(),
-                ));
+                return Err(Error::StopJobFail(format!(
+                    "Target index must be inferior to {}",
+                    self.num_procs
+                )));
             }
         }
         for i in start_index..end_index {
@@ -309,22 +314,16 @@ impl Job {
                 eprintln!("{job_name}:{i} is in a state where it can't stop");
                 continue;
             }
-            // let mut child_id: u32 = child.id();
-
-            // if let Some(mut signal) = self.stop_signal {
-            //     unsafe {
-            //         kill(child_id, signal);
-            //     }
-            // }
-            // else {
-            // 	unsafe {
-            //         kill(child_id, SIGTERM);
-            //     }
-            // }
+            let child_id: u32 = process.child.as_ref().unwrap().id();
+            println!("child id = {child_id}");
+            println!("signal nb = {}", self.stop_signal.to_owned() as i32);
+            unsafe {
+                kill(child_id, self.stop_signal.to_owned() as i32);
+            }
             self.processes[i].set_state(ProcessStates::Stopping);
             println!("LOG: {job_name}:{i} is now in STOPPING state");
         }
-        Ok(format!("{job_name} is stopped successffully!"))
+        Ok(format!("{job_name} is stopped successfully!"))
     }
 
     // from http://supervisord.org/subprocess.html#process-states
@@ -383,10 +382,6 @@ impl Job {
     }
 
     fn _handle_stopping(&mut self, process_index: usize, job_name: &String) {
-        //        println!(
-        //            "LOG: {job_name}:{process_index}: {:#?}",
-        //            self.processes[process_index].child
-        //        );
         let process: &mut ProcessInfo = &mut self.processes[process_index];
         let child: &mut Child = if let Some(c) = &mut process.child {
             c
@@ -402,9 +397,6 @@ impl Job {
             Ok(None) => {
                 if process.state_changed_at.elapsed().as_secs() >= self.stop_wait_secs as u64 {
                     let _ = child.kill();
-                    println!(
-                        "LOG: {job_name}:{process_index} is not terminated: try to force kill"
-                    );
                 }
             }
             Err(e) => eprintln!("Error attempting to wait: {e}"),
