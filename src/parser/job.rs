@@ -197,9 +197,10 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                return Err(Error::StartJobFail(
-                    "Target index must be inferior to {:?}".into(),
-                ));
+                return Err(Error::StartJobFail(format!(
+                    "Target index must be inferior to {:?}",
+                    self.num_procs
+                )));
             }
         }
 
