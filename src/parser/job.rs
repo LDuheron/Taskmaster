@@ -309,10 +309,6 @@ impl Job {
                 eprintln!("{job_name}:{i} is in a state where it can't stop");
                 continue;
             }
-            // let _ = process.child.as_mut().unwrap().kill();
-            self.processes[i].set_state(ProcessStates::Stopping);
-            println!("LOG: {job_name}:{i} is now in STOPPING state");
-
             // let mut child_id: u32 = child.id();
 
             // if let Some(mut signal) = self.stop_signal {
@@ -325,6 +321,8 @@ impl Job {
             //         kill(child_id, SIGTERM);
             //     }
             // }
+            self.processes[i].set_state(ProcessStates::Stopping);
+            println!("LOG: {job_name}:{i} is now in STOPPING state");
         }
         Ok(format!("{job_name} is stopped successffully!"))
     }
@@ -340,7 +338,7 @@ impl Job {
                 ProcessStates::Running => self._handle_running(process_index, job_name),
                 ProcessStates::Exited => self._handle_exited(process_index, job_name),
                 // fatal and stopped need user interaction to change
-                _ => return,
+                _ => continue,
             };
         }
     }
@@ -385,6 +383,10 @@ impl Job {
     }
 
     fn _handle_stopping(&mut self, process_index: usize, job_name: &String) {
+        //        println!(
+        //            "LOG: {job_name}:{process_index}: {:#?}",
+        //            self.processes[process_index].child
+        //        );
         let process: &mut ProcessInfo = &mut self.processes[process_index];
         let child: &mut Child = if let Some(c) = &mut process.child {
             c
@@ -393,15 +395,12 @@ impl Job {
         };
         match child.try_wait() {
             Ok(Some(_)) => {
-                println!("in 1....");
                 process.set_state(ProcessStates::Stopped);
                 process.child = None;
                 println!("LOG: {job_name}:{process_index} is now in STOPPED state");
             }
             Ok(None) => {
-                println!("in 2....");
                 if process.state_changed_at.elapsed().as_secs() >= self.stop_wait_secs as u64 {
-                    println!("in 3....");
                     let _ = child.kill();
                     println!(
                         "LOG: {job_name}:{process_index} is not terminated: try to force kill"
