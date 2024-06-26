@@ -202,17 +202,24 @@ impl Config {
         }
     }
 
-    fn _parse_umask(raw: &RawConfig) -> Result<Option<String>> {
+    fn _parse_umask(raw: &RawConfig) -> Result<Option<u32>> {
         let field_name: String = String::from("umask");
-        let default: Option<String> = Job::default().umask;
-        let Some(umask) = Self::_parse_one_word_field(&raw, field_name.clone(), default.clone())?
+        let default: Option<String> = None;
+        let Some(umask_str) = Self::_parse_one_word_field(&raw, field_name.clone(), default)?
         else {
             return Ok(None);
         };
         let is_valid_umask: bool =
-            umask.len() == 3 && umask.chars().all(|c| matches!(c, '0'..='8'));
+            umask_str.len() == 3 && umask_str.chars().all(|c| matches!(c, '0'..='8'));
         if is_valid_umask {
-            Ok(Some(umask))
+            let umask = umask_str.parse::<u32>();
+            match umask {
+                Ok(umask) => Ok(Some(umask)),
+                Err(_e) => Err(Error::FieldBadFormat {
+                    field_name,
+                    msg: "Field contain too much characters".into(),
+                }), // passer de base octale a la base decimale
+            }
         } else {
             Err(Error::FieldBadFormat {
                 field_name,

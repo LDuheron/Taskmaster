@@ -1,7 +1,12 @@
 use std::collections::HashMap;
 use std::fs::OpenOptions;
+use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+
+extern "C" {
+    pub fn umask(mask: u32) -> u32;
+}
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
@@ -39,7 +44,7 @@ pub struct Job {
     pub stdout_file: Option<String>,
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
-    pub umask: Option<String>,
+    pub umask: Option<u32>,
     // TODO
     pub processes: Option<HashMap<u32, Child>>,
 }
@@ -85,7 +90,7 @@ impl Clone for Job {
             stdout_file: self.stdout_file.clone(),
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
-            umask: self.umask.clone(),
+            umask: self.umask,
             // TODO
             processes: None,
         }
@@ -145,17 +150,15 @@ impl Job {
                 command.envs(environment);
             }
 
-            // if let Some(ref config_umask) = self.umask {
-            //     match command.pre_exec( || {
-            //         unsafe { libc::umask(config_umask) }; // checker si c'est le bon input
-            //     }) {
-            //         Ok(_) => {}
-            //         Err(e) => {
-            //             eprintln!("Error: {:?}", e);
-            //             return;
-            //         }
-            //     }
-            // }
+            // move -> prend l'ownership de config_umask
+            if let Some(config_umask) = self.umask {
+                unsafe {
+                    command.pre_exec(move || {
+                        umask(config_umask);
+                        Ok(())
+                    });
+                }
+            }
 
             if let Some(ref work_dir) = self.work_dir {
                 let path = Path::new(work_dir);
