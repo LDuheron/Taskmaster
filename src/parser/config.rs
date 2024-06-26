@@ -1,7 +1,7 @@
-use super::job::{AutorestartOptions, Job, StopSignals};
+use super::job::{AutorestartOptions, Job, ProcessInfo, StopSignals};
 use crate::{Error, Result};
 use configparser::ini::Ini;
-use std::collections::HashMap;
+use std::{any::type_name, collections::HashMap, str::FromStr};
 
 pub type ConfigParserContent = HashMap<String, HashMap<String, Option<String>>>;
 pub type RawConfig = HashMap<String, Option<String>>;
@@ -23,6 +23,12 @@ impl Config {
         }
     }
 
+    pub fn jobs_routine(&mut self) {
+        for (job_name, job) in self.map.iter_mut() {
+            job.processes_routine(job_name);
+        }
+    }
+
     pub fn get_mut(&mut self, key: &String) -> Option<&mut Job> {
         self.map.get_mut(key)
     }
@@ -32,48 +38,41 @@ impl Config {
     }
 
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
-        let mut old_config: Config = self.clone();
-        self.map.clear();
-        let parsing_result = Self::parse_config_file(self, config_path);
-        if parsing_result.is_err() {
-            println!(
-                "log: cant reload the config: {:?}",
-                parsing_result.unwrap_err()
-            );
-            self.map = old_config.map;
-            return Ok(());
-        }
+        let mut new_config: Config = Config::new();
+        new_config.parse_config_file(config_path)?;
         println!("log: reload config with {}", config_path);
-        for entry in self.map.iter_mut() {
-            let job_name: String = entry.0.into();
-            let job: &mut Job = entry.1;
-            let old_job: &mut Job = match old_config.map.get_mut(&job_name) {
-                Some(j) => j,
+        for (job_name, new_job) in new_config.map.iter_mut() {
+            match self.map.get_mut(job_name) {
+                // job is changed case
+                Some(old_job) if old_job != new_job => {
+                    println!("job is changed");
+                    let _ = old_job.stop(&job_name, None);
+                    self.map.insert(job_name.clone(), new_job.clone());
+                    if new_job.auto_start {
+                        let job: &mut Job = self.get_mut(job_name).unwrap();
+                        let _ = job.start(job_name, None);
+                    }
+                }
+                // job is the same
+                Some(old_job) if old_job == new_job => continue,
                 // new job case
                 _ => {
-                    if job.auto_start {
-                        job.start(&job_name, None); // TODO ! set None as target process for compilation error
+                    self.map.insert(job_name.clone(), new_job.clone());
+                    if new_job.auto_start {
+                        let job: &mut Job = self.get_mut(job_name).unwrap();
+                        let _ = job.start(job_name, None);
                     }
                     continue;
                 }
             };
-            // job is changed case
-            if job != old_job {
-                // TODO: check if the job is running and handle this
-                old_job.start(&job_name, None); // TODO ! set None as target process for compilation error
-                                                //     old_job.stop(&job_name);
-                                                //     job.start(&job_name);
-                                                // } else if job.auto_start {
-                                                //     job.start(&job_name);
-                                                // }
-            }
-            old_config.map.remove_entry(&job_name);
         }
-        // job is not present in new config file
-        for entry in old_config.map.iter_mut() {
-            let old_job_name: String = entry.0.into();
-            let old_job: &mut Job = entry.1;
-            old_job.stop(&old_job_name, None); // TODO ! set None as target process for compilation error
+        // job is deleted
+        // yes this is horrible, idk how to improve this
+        for (job_name, _old_job) in self.map.clone().iter() {
+            if new_config.contains_key(job_name) == false {
+                let _ = self.map.get_mut(job_name).unwrap().stop_job_now();
+                self.map.remove(&job_name.clone());
+            }
         }
         Ok(())
     }
@@ -109,7 +108,7 @@ impl Config {
             let job_name: &String = entry.0;
             let job: &mut Job = entry.1;
             if job.auto_start {
-                job.start(job_name, None); // TODO ! set None as target process for compilation error
+                let _ = job.start(job_name, None);
             }
         }
         Ok(())
@@ -119,7 +118,7 @@ impl Config {
     // -- PRIVATE
     //
 
-    fn _parse_raw_config_field<T: std::str::FromStr>(
+    fn _parse_raw_config_field<T: FromStr>(
         raw: &RawConfig,
         field_name: String,
         default: T,
@@ -128,7 +127,7 @@ impl Config {
             Some(Some(value)) => Ok(value.parse::<T>().map_err(|_| Error::CantParseField {
                 field_name,
                 value: value.to_string(),
-                type_name: std::any::type_name::<T>().into(),
+                type_name: type_name::<T>().into(),
             })?),
             _ => Ok(default),
         }
@@ -309,17 +308,17 @@ impl Config {
         )
     }
 
-    fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<u8>> {
+    fn _parse_exitcodes(raw: &RawConfig) -> Result<Vec<i32>> {
         let field_name: String = String::from("exitcodes");
         match raw.get(&field_name) {
             Some(Some(str)) => str
                 .split(",")
                 .map(str::trim)
                 .map(|s| {
-                    s.parse::<u8>().map_err(|_| Error::CantParseField {
+                    s.parse::<i32>().map_err(|_| Error::CantParseField {
                         field_name: field_name.clone(),
                         value: str.to_string(),
-                        type_name: std::any::type_name::<u8>().into(),
+                        type_name: type_name::<i32>().into(),
                     })
                 })
                 .collect(),
@@ -360,10 +359,11 @@ impl Config {
     }
 
     fn _parse_job(raw: &RawConfig) -> Result<Job> {
+        let num_procs: u32 = Self::_parse_num_procs(&raw)?;
         Ok(Job {
             command: Self::_parse_command(&raw)?,
             arguments: Self::_parse_arguments(&raw)?,
-            num_procs: Self::_parse_num_procs(&raw)?,
+            num_procs,
             auto_start: Self::_parse_autostart(&raw)?,
             auto_restart: Self::_parse_autorestart(&raw)?,
             exit_codes: Self::_parse_exitcodes(&raw)?,
@@ -376,7 +376,7 @@ impl Config {
             environment: Self::_parse_environment(&raw)?,
             work_dir: Self::_parse_working_directory(&raw)?,
             umask: Self::_parse_umask(&raw)?,
-            ..Default::default()
+            processes: vec![ProcessInfo::default(); num_procs as usize],
         })
     }
 }
@@ -431,19 +431,6 @@ mod tests {
             *job,
             Job {
                 command,
-                num_procs: 1,
-                auto_start: true,
-                auto_restart: AutorestartOptions::UnexpectedExit,
-                exit_codes: vec![1],
-                start_secs: 1,
-                start_retries: 3,
-                stop_signal: StopSignals::TERM,
-                stop_wait_secs: 10,
-                stderr_file: None,
-                stdout_file: None,
-                environment: None,
-                work_dir: None,
-                umask: None,
                 ..Default::default()
             },
         );
@@ -466,9 +453,9 @@ mod tests {
             Job {
                 command,
                 num_procs: 1,
-                auto_start: true,
+                auto_start: false,
                 auto_restart: AutorestartOptions::UnexpectedExit,
-                exit_codes: vec![1],
+                exit_codes: vec![0],
                 start_secs: 1,
                 start_retries: 3,
                 stop_signal: StopSignals::TERM,
@@ -734,21 +721,6 @@ mod tests {
             "[{job_name}]
              command={command}
              exitcodes=1, 2, 5, asdf, 4",
-        ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
-        assert!(matches!(val, Err(Error::CantParseEntry { .. })));
-        assert!(config.map.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn exitcodes_overflow() -> Result<()> {
-        let job_name: String = String::from("test");
-        let command: String = String::from("/bin/test");
-        let (config_parser, mut config) = get_config_parser_and_config(format!(
-            "[{job_name}]
-             command={command}
-             exitcodes=1, 2, 5, 256, 4",
         ));
         let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
