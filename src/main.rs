@@ -120,29 +120,20 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                         continue;
                     };
                 let job: &mut parser::job::Job = config.get_mut(&client_arg).unwrap();
-                let mut ret = Ok(());
-                match client_cmd.as_str() {
-                    "start" => {
-                        // TODO: handle error for start
-                        job.start(&client_arg, client_process);
-                    }
-                    "stop" => {
-                        ret = job.stop(&client_arg, client_process);
-                    }
-                    "restart" => {
-                        ret = job.restart(&client_arg, client_process);
-                    }
-                    _ => {
-                        ret = Err(Error::CommandIsNotSuported(
-                            "Unknown command: Please try start, stop or restart!".into(),
-                        ))
-                    }
-                }
+                let ret = match client_cmd.as_str() {
+                    "start" => job.start(&client_arg, client_process),
+                    "stop" => job.stop(&client_arg, client_process),
+                    "restart" => job.restart(&client_arg, client_process),
+                    _ => Err(Error::CommandIsNotSuported(
+                        "Unknown command: Please try start, stop or restart!".into(),
+                    )),
+                };
                 if ret.is_err() {
                     s.write(&ret.unwrap_err().to_string().into_bytes())
                         .map_err(|e| Error::IO(e.to_string()))?;
                 } else {
-                    s.write(b"Success").map_err(|e| Error::IO(e.to_string()))?;
+                    s.write(&ret.unwrap().into_bytes())
+                        .map_err(|e| Error::IO(e.to_string()))?;
                 }
             }
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => sleep(duration),

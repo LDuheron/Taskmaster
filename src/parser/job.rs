@@ -181,7 +181,11 @@ impl PartialEq for Job {
 }
 
 impl Job {
-    pub fn start(self: &mut Self, job_name: &String, target_process: Option<usize>) {
+    pub fn start(
+        self: &mut Self,
+        job_name: &String,
+        target_process: Option<usize>,
+    ) -> Result<String> {
         let mut start_index: usize = 0;
         let mut end_index: usize = self.num_procs as usize;
         if let Some(nb) = target_process {
@@ -189,8 +193,9 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                eprintln!("Target index must be inferior to {:?}", self.num_procs);
-                return;
+                return Err(Error::StartJobFail(
+                    "Target index must be inferior to {:?}".into(),
+                ));
             }
         }
 
@@ -225,8 +230,9 @@ impl Job {
                 if path.is_dir() == true {
                     command.current_dir(work_dir);
                 } else {
-                    eprintln!("Error: {:?}", work_dir);
-                    return;
+                    return Err(Error::StartJobFail(format!(
+                        "{work_dir} is not a directory!"
+                    )));
                 }
             }
 
@@ -239,10 +245,7 @@ impl Job {
                     Ok(file) => {
                         command.stderr(Stdio::from(file));
                     }
-                    Err(e) => {
-                        eprintln!("Error: {:?}", e);
-                        return;
-                    }
+                    Err(e) => return Err(Error::StartJobFail(e.to_string())),
                 }
             }
 
@@ -255,10 +258,7 @@ impl Job {
                     Ok(file) => {
                         command.stdout(Stdio::from(file));
                     }
-                    Err(e) => {
-                        eprintln!("Error: {:?}", e);
-                        return;
-                    }
+                    Err(e) => return Err(Error::StartJobFail(e.to_string())),
                 }
             }
 
@@ -269,25 +269,28 @@ impl Job {
                     self.processes[i as usize].set_state(ProcessStates::Starting);
                     println!("LOG: {job_name}:{i} is now in STARTING state");
                 }
-                Err(e) => {
-                    eprintln!("Failed to start process: {:?}", e);
-                }
+                Err(e) => return Err(Error::StartJobFail(e.to_string())),
             }
         }
+        Ok(format!("Command {job_name} is started successfully!"))
     }
 
     pub fn restart(
         self: &mut Self,
         job_name: &String,
         target_process: Option<usize>,
-    ) -> Result<()> {
+    ) -> Result<String> {
         println!("LOG: restart {}", job_name);
         self.stop(job_name, target_process)?;
-        self.start(job_name, target_process); // TODO: handle result
-        Ok(())
+        self.start(job_name, target_process)?;
+        Ok(format!("{job_name} is restarted successfully!"))
     }
 
-    pub fn stop(self: &mut Self, job_name: &String, target_process: Option<usize>) -> Result<()> {
+    pub fn stop(
+        self: &mut Self,
+        job_name: &String,
+        target_process: Option<usize>,
+    ) -> Result<String> {
         let mut start_index: usize = 0;
         let mut end_index: usize = self.num_procs as usize;
         if let Some(nb) = target_process {
@@ -295,7 +298,7 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                return Err(Error::Default(
+                return Err(Error::StopJobFail(
                     "Target index must be inferior to {:?}".into(),
                 ));
             }
@@ -323,7 +326,7 @@ impl Job {
             //     }
             // }
         }
-        Ok(())
+        Ok(format!("{job_name} is stopped successffully!"))
     }
 
     // from http://supervisord.org/subprocess.html#process-states
@@ -372,7 +375,7 @@ impl Job {
             if (process.state_changed_at.elapsed().as_secs() as u32) < process.nb_retries {
                 return;
             }
-            self.start(job_name, Some(process_index));
+            let _ = self.start(job_name, Some(process_index));
             return;
         }
         process.nb_retries = 0;
@@ -445,7 +448,7 @@ impl Job {
                     || (self.auto_restart == AutorestartOptions::UnexpectedExit
                         && self.exit_codes.contains(&code) == false)
                 {
-                    self.start(job_name, Some(process_index));
+                    let _ = self.start(job_name, Some(process_index));
                 }
             }
             Err(e) => eprintln!("Error attempting to wait: {e}"),

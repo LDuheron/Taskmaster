@@ -50,7 +50,7 @@ impl Config {
                     self.map.insert(job_name.clone(), new_job.clone());
                     if new_job.auto_start {
                         let job: &mut Job = self.get_mut(job_name).unwrap();
-                        job.start(job_name, None);
+                        let _ = job.start(job_name, None);
                     }
                 }
                 // job is the same
@@ -60,7 +60,7 @@ impl Config {
                     self.map.insert(job_name.clone(), new_job.clone());
                     if new_job.auto_start {
                         let job: &mut Job = self.get_mut(job_name).unwrap();
-                        job.start(job_name, None);
+                        let _ = job.start(job_name, None);
                     }
                     continue;
                 }
@@ -106,7 +106,7 @@ impl Config {
             let job_name: &String = entry.0;
             let job: &mut Job = entry.1;
             if job.auto_start {
-                job.start(job_name, None); // TODO ! set None as target process for compilation error
+                let _ = job.start(job_name, None);
             }
         }
         Ok(())

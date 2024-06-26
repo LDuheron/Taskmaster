@@ -23,6 +23,8 @@ pub enum Error {
     CantParseEnvEntry(String),
     CommandIsNotSuported(String),
     IO(String),
+    StartJobFail(String),
+    StopJobFail(String),
     Default(String),
 }
 
