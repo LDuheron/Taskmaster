@@ -316,8 +316,6 @@ impl Job {
                 continue;
             }
             let child_id: u32 = process.child.as_ref().unwrap().id();
-            println!("child id = {child_id}");
-            println!("signal nb = {}", self.stop_signal.to_owned() as i32);
             unsafe {
                 kill(child_id, self.stop_signal.to_owned() as i32);
             }
@@ -325,6 +323,15 @@ impl Job {
             println!("LOG: {job_name}:{i} is now in STOPPING state");
         }
         Ok(format!("{job_name} is stopped successfully!"))
+    }
+
+    pub fn stop_job_now(self: &mut Self) {
+        for p in self.processes.iter_mut() {
+            if let Some(c) = &mut p.child {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+        }
     }
 
     // from http://supervisord.org/subprocess.html#process-states
