@@ -1,4 +1,5 @@
 use super::job::{AutorestartOptions, Job, ProcessInfo, StopSignals};
+use crate::logger::log;
 use crate::{Error, Result};
 use configparser::ini::Ini;
 use std::{any::type_name, collections::HashMap, str::FromStr};
@@ -91,10 +92,11 @@ impl Config {
             let entry_name: String = entry.0.clone();
             let job: Job = match Self::_parse_job(&entry.1) {
                 Err(e) => {
+                    log(&format!("ERROR: {e}"));
                     return Err(Error::CantParseEntry {
                         entry_name,
                         e: e.to_string(),
-                    })
+                    });
                 }
                 Ok(content) => content,
             };
