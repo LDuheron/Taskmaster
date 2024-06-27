@@ -328,6 +328,35 @@ impl Job {
         Ok(format!("{job_name} is stopped successfully!"))
     }
 
+    pub fn status(
+        self: &mut Self,
+        job_name: &String,
+        target_process: Option<usize>,
+    ) -> Result<String> {
+        let mut start_index: usize = 0;
+        let mut end_index: usize = self.num_procs as usize;
+        if let Some(nb) = target_process {
+            if nb < self.num_procs as usize {
+                start_index = nb;
+                end_index = nb + 1;
+            } else {
+                return Err(Error::StatusJobFail(format!(
+                    "Target index must be inferior to {}",
+                    self.num_procs
+                )));
+            }
+        }
+        let mut return_message: String = format!("\nProgram: {job_name:^3}");
+        for i in start_index..end_index {
+            let process: &mut ProcessInfo = &mut self.processes[i as usize];
+            return_message = format!(
+                "{return_message}\n--> nb: {i:^3} | state: {:^3?}",
+                process.state
+            );
+        }
+        return_message = format!("{return_message}\n",);
+        Ok(return_message)
+    }
     pub fn stop_job_now(self: &mut Self) {
         for p in self.processes.iter_mut() {
             if let Some(c) = &mut p.child {

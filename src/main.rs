@@ -124,6 +124,7 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                     "start" => job.start(&client_arg, client_process),
                     "stop" => job.stop(&client_arg, client_process),
                     "restart" => job.restart(&client_arg, client_process),
+                    "status" => job.status(&client_arg, client_process),
                     _ => Err(Error::CommandIsNotSuported(
                         "Unknown command: Please try start, stop or restart!".into(),
                     )),
