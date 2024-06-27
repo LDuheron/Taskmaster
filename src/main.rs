@@ -109,6 +109,11 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                 }
                 let formatted = String::from_utf8_lossy(&data[..bytes_read]).into_owned();
                 println!("read: {}", formatted);
+                if formatted.trim() == "status".to_string() {
+                    s.write(&config.status().into_bytes())
+                        .map_err(|e| Error::IO(e.to_string()))?;
+                    continue;
+                }
                 let (client_cmd, client_arg, client_process) =
                     if let Ok((client_cmd, client_arg, client_process)) =
                         parse_client_input(config, &formatted)

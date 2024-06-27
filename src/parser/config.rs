@@ -47,6 +47,16 @@ impl Config {
         }
     }
 
+    pub fn status(&mut self) -> String {
+        let mut ret: String = String::new();
+        for entry in self.map.iter_mut() {
+            let job_name: &String = entry.0;
+            let job: &mut Job = entry.1;
+            ret = format!("{ret}{}", job.status(job_name, None).unwrap());
+        }
+        ret
+    }
+
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut new_config: Config = Config::new();
         new_config.parse_config_file(config_path)?;
