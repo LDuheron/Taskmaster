@@ -201,22 +201,29 @@ impl Config {
         }
     }
 
-    fn _parse_umask(raw: &RawConfig) -> Result<Option<String>> {
+    fn _parse_umask(raw: &RawConfig) -> Result<Option<u32>> {
         let field_name: String = String::from("umask");
-        let default: Option<String> = Job::default().umask;
-        let Some(umask) = Self::_parse_one_word_field(&raw, field_name.clone(), default.clone())?
+        let default: Option<String> = None;
+        let Some(umask_str) = Self::_parse_one_word_field(&raw, field_name.clone(), default)?
         else {
             return Ok(None);
         };
         let is_valid_umask: bool =
-            umask.len() == 3 && umask.chars().all(|c| matches!(c, '0'..='8'));
-        if is_valid_umask {
-            Ok(Some(umask))
-        } else {
-            Err(Error::FieldBadFormat {
+            umask_str.len() == 3 && umask_str.chars().all(|c| matches!(c, '0'..='8'));
+        if is_valid_umask == false {
+            return Err(Error::FieldBadFormat {
                 field_name,
                 msg: "Field contain too much characters".into(),
-            })
+            });
+        }
+        let umask = u32::from_str_radix(&umask_str, 8);
+        match umask {
+            Ok(umask) => Ok(Some(umask)),
+            Err(_) => Err(Error::CantParseField {
+                field_name,
+                value: umask_str,
+                type_name: type_name::<u32>().into(),
+            }),
         }
     }
 
@@ -516,7 +523,7 @@ mod tests {
                     ("LASTNAME".into(), "Doe".into())
                 ])),
                 work_dir: Some("/tmp".into()),
-                umask: Some("022".into()),
+                umask: Some(0o22),
                 ..Default::default()
             },
         );
@@ -1024,7 +1031,7 @@ mod tests {
             *job,
             Job {
                 command,
-                umask: Some("012".to_string()),
+                umask: Some(0o12),
                 ..Default::default()
             },
         );
