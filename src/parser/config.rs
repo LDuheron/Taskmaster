@@ -212,13 +212,13 @@ impl Config {
         let is_valid_umask: bool =
             umask_str.len() == 3 && umask_str.chars().all(|c| matches!(c, '0'..='8'));
         if is_valid_umask {
-            let umask = umask_str.parse::<u32>();
+            let umask = u32::from_str_radix(&umask_str, 8);
             match umask {
                 Ok(umask) => Ok(Some(umask)),
                 Err(_e) => Err(Error::FieldBadFormat {
                     field_name,
                     msg: "Field contain too much characters".into(),
-                }), // passer de base octale a la base decimale
+                }),
             }
         } else {
             Err(Error::FieldBadFormat {

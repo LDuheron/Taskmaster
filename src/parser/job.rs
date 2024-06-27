@@ -150,7 +150,7 @@ impl Job {
                 command.envs(environment);
             }
 
-            // move -> prend l'ownership de config_umask
+            // Move -> prend l'ownership de config_umask
             if let Some(config_umask) = self.umask {
                 unsafe {
                     command.pre_exec(move || {
