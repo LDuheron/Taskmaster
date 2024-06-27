@@ -2,12 +2,16 @@ mod config;
 mod error;
 mod job;
 mod logger;
+mod parsing;
 
 use config::Config;
 use error::{Error, Result};
 use job::Job;
-use logger::log;
-use logger::Logger;
+use logger::{log, Logger};
+use parsing::{
+    parse_arg_from_client_input, parse_cmd_from_client_input,
+    parse_target_process_number_from_client_input,
+};
 use std::env::args;
 use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
@@ -42,42 +46,6 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
             RELOAD_CONFIG = false;
         }
     }
-}
-
-fn parse_cmd_from_client_input(raw: &String) -> Result<String> {
-    if let Some(cmd) = raw.split_whitespace().next() {
-        Ok(cmd.to_string())
-    } else {
-        Err(Error::WrongClientInputFormat)
-    }
-}
-
-fn parse_arg_from_client_input(raw: &String) -> Result<String> {
-    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        let index = cmd.rfind(":");
-        if index.is_some() {
-            let split_cmd = &cmd[0..index.unwrap()];
-            Ok(split_cmd.to_string())
-        } else {
-            Ok(cmd.to_string())
-        }
-    } else {
-        Err(Error::WrongClientInputFormat)
-    }
-}
-
-fn parse_target_process_number_from_client_input(raw: &String) -> Result<Option<usize>> {
-    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        if let Some(index) = cmd.rfind(":") {
-            let split_cmd = &cmd[index + 1..];
-            if let Ok(number) = split_cmd.parse::<usize>() {
-                return Ok(Some(number));
-            } else {
-                return Err(Error::WrongClientInputFormat);
-            }
-        }
-    }
-    Ok(None)
 }
 
 fn is_job_from_config_map(config: &mut Config, cmd: &String) -> bool {
