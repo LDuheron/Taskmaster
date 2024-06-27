@@ -5,6 +5,7 @@ pub enum Error {
     BadNumberOfArguments(String),
     CantLoadFile(String),
     NoJobEntry,
+    JobEntryNameWithNonAlphanumChar,
     CantParseEntry {
         entry_name: String,
         e: String,
