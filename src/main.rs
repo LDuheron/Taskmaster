@@ -1,11 +1,13 @@
+mod config;
 mod error;
+mod job;
 mod logger;
-mod parser;
 
-use crate::logger::log;
+use config::Config;
 use error::{Error, Result};
+use job::Job;
+use logger::log;
 use logger::Logger;
-use parser::config::Config;
 use std::env::args;
 use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
@@ -132,7 +134,7 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                             .map_err(|e| Error::IO(e.to_string()))?;
                         continue;
                     };
-                let job: &mut parser::job::Job = config.get_mut(&client_arg).unwrap();
+                let job: &mut Job = config.get_mut(&client_arg).unwrap();
                 let ret = match client_cmd.as_str() {
                     "start" => job.start(&client_arg, client_process),
                     "stop" => job.stop(&client_arg, client_process),
