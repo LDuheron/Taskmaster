@@ -55,7 +55,6 @@ impl Config {
             match self.map.get_mut(job_name) {
                 // job is changed case
                 Some(old_job) if old_job != new_job => {
-                    println!("job is changed");
                     self.map.get_mut(job_name).unwrap().stop_job_now();
                     self.map.insert(job_name.clone(), new_job.clone());
                     if new_job.auto_start {
@@ -67,7 +66,6 @@ impl Config {
                 Some(old_job) if old_job == new_job => continue,
                 // new job case
                 _ => {
-                    println!("new job");
                     self.map.insert(job_name.clone(), new_job.clone());
                     if new_job.auto_start {
                         let job: &mut Job = self.get_mut(job_name).unwrap();
