@@ -61,7 +61,7 @@ impl Config {
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut new_config: Config = Config::new();
         new_config.parse_config_file(config_path)?;
-        // println!("log: reload config with {}", config_path);
+        // println!("reload config with {}", config_path);
         for (job_name, new_job) in new_config.map.iter_mut() {
             match self.map.get_mut(job_name) {
                 // job is changed case

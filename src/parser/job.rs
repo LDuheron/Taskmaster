@@ -333,7 +333,7 @@ impl Job {
             }
             self.processes[i].set_state(ProcessStates::Stopping);
             log(&format!("INFO: {job_name}:{i} is now in STOPPING state"));
-            println!("LOG: {job_name}:{i} is now in STOPPING state");
+            println!("{job_name}:{i} is now in STOPPING state");
         }
         Ok(format!("{job_name} is stopped successfully!"))
     }
@@ -411,7 +411,7 @@ impl Job {
                 log(&format!(
                     "INFO: {job_name}:{process_index} is now in BACKOFF state"
                 ));
-                println!("LOG: {job_name}:{process_index} is now in BACKOFF state");
+                println!("{job_name}:{process_index} is now in BACKOFF state");
             }
             Ok(None) => {
                 if process.state_changed_at.elapsed().as_secs() >= self.start_secs as u64 {
@@ -420,7 +420,7 @@ impl Job {
                     log(&format!(
                         "INFO: {job_name}:{process_index} is now in RUNNING state"
                     ));
-                    println!("LOG: {job_name}:{process_index} is now in RUNNING state");
+                    println!("{job_name}:{process_index} is now in RUNNING state");
                 }
             }
             Err(e) => {
@@ -446,7 +446,7 @@ impl Job {
         log(&format!(
             "INFO: {job_name}:{process_index} is now in FATAL state"
         ));
-        println!("LOG: {job_name}:{process_index} is now in FATAL state");
+        println!("{job_name}:{process_index} is now in FATAL state");
     }
 
     fn _handle_stopping(&mut self, process_index: usize, job_name: &String) {
@@ -466,7 +466,7 @@ impl Job {
                 log(&format!(
                     "INFO: {job_name}:{process_index} is now in STOPPED state"
                 ));
-                println!("LOG: {job_name}:{process_index} is now in STOPPED state");
+                println!("{job_name}:{process_index} is now in STOPPED state");
             }
             Ok(None) => {
                 if process.state_changed_at.elapsed().as_secs() >= self.stop_wait_secs as u64 {
@@ -498,14 +498,14 @@ impl Job {
                 log(&format!(
                     "INFO: {job_name}:{process_index} is now in STOPPED state"
                 ));
-                println!("LOG: {job_name}:{process_index} is now in STOPPED state");
+                println!("{job_name}:{process_index} is now in STOPPED state");
             }
             Ok(Some(_)) => {
                 process.set_state(ProcessStates::Exited);
                 log(&format!(
                     "INFO: {job_name}:{process_index} is now in EXITED state"
                 ));
-                println!("LOG: {job_name}:{process_index} is now in EXITED state");
+                println!("{job_name}:{process_index} is now in EXITED state");
             }
             Err(e) => {
                 log(&format!(
