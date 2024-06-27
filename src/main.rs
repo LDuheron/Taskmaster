@@ -6,7 +6,6 @@ use error::{Error, Result};
 use logger::Logger;
 use parser::config::Config;
 use std::env::args;
-use std::fmt::format;
 use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
 use std::thread::sleep;
