@@ -37,10 +37,20 @@ impl Config {
         self.map.contains_key(key)
     }
 
+    pub fn run_autostart_jobs(&mut self) {
+        for entry in self.map.iter_mut() {
+            let job_name: &String = entry.0;
+            let job: &mut Job = entry.1;
+            if job.auto_start {
+                let _ = job.start(job_name, None);
+            }
+        }
+    }
+
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut new_config: Config = Config::new();
         new_config.parse_config_file(config_path)?;
-        println!("log: reload config with {}", config_path);
+        // println!("log: reload config with {}", config_path);
         for (job_name, new_job) in new_config.map.iter_mut() {
             match self.map.get_mut(job_name) {
                 // job is changed case
@@ -57,6 +67,7 @@ impl Config {
                 Some(old_job) if old_job == new_job => continue,
                 // new job case
                 _ => {
+                    println!("new job");
                     self.map.insert(job_name.clone(), new_job.clone());
                     if new_job.auto_start {
                         let job: &mut Job = self.get_mut(job_name).unwrap();
@@ -104,13 +115,6 @@ impl Config {
             .load(config_path)
             .map_err(|e| Error::CantLoadFile(e.to_string()))?;
         self.parse_content_of_parserconfig(cfg)?;
-        for entry in self.map.iter_mut() {
-            let job_name: &String = entry.0;
-            let job: &mut Job = entry.1;
-            if job.auto_start {
-                let _ = job.start(job_name, None);
-            }
-        }
         Ok(())
     }
 

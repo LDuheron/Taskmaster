@@ -27,7 +27,7 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
         if RELOAD_CONFIG {
             match config.reload_config(&config_file) {
                 Err(e) => println!("log: can't reload file: {e}"),
-                Ok(()) => println!("log: config file is reloaded: \n{:#?}", config),
+                Ok(()) => println!("log: config file is reloaded:"), // \n{:#?}", config),
             }
             RELOAD_CONFIG = false;
         }
@@ -162,6 +162,7 @@ fn main() -> Result<()> {
     let config_file: String = args().nth(1).unwrap();
     let mut config: Config = Config::new();
     config.parse_config_file(&config_file)?;
+    config.run_autostart_jobs();
     println!("{:#?}", config);
     unsafe {
         signal(SIGHUP, handle_sighup as usize);
