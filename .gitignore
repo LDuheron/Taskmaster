@@ -3,3 +3,6 @@ target/
 *nfs*
 .vscode
 .vagrant
+err
+out
+a.out
