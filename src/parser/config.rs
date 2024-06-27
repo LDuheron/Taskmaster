@@ -56,7 +56,7 @@ impl Config {
                 // job is changed case
                 Some(old_job) if old_job != new_job => {
                     println!("job is changed");
-                    let _ = old_job.stop(&job_name, None);
+                    self.map.get_mut(job_name).unwrap().stop_job_now();
                     self.map.insert(job_name.clone(), new_job.clone());
                     if new_job.auto_start {
                         let job: &mut Job = self.get_mut(job_name).unwrap();
@@ -81,7 +81,7 @@ impl Config {
         // yes this is horrible, idk how to improve this
         for (job_name, _old_job) in self.map.clone().iter() {
             if new_config.contains_key(job_name) == false {
-                let _ = self.map.get_mut(job_name).unwrap().stop_job_now();
+                self.map.get_mut(job_name).unwrap().stop_job_now();
                 self.map.remove(&job_name.clone());
             }
         }
