@@ -202,10 +202,12 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                return Err(Error::StartJobFail(format!(
-                    "Target index must be inferior to {:?}",
+                let error_message = Error::StartJobFail(format!(
+                    "Target index must be inferior to {}",
                     self.num_procs
-                )));
+                ));
+                log(&error_message.to_string());
+                return Err(error_message);
             }
         }
 
@@ -278,7 +280,7 @@ impl Job {
                     self.processes[i as usize].child = Some(child_process);
                     self.processes[i as usize].set_state(ProcessStates::Starting);
                     log(&format!("INFO: {job_name}:{i} is now in STARTING state"));
-                    println!("LOG: {job_name}:{i} is now in STARTING state");
+                    println!("{job_name}:{i} is now in STARTING state");
                 }
                 Err(e) => return Err(Error::StartJobFail(e.to_string())),
             }
@@ -291,7 +293,6 @@ impl Job {
         job_name: &String,
         target_process: Option<usize>,
     ) -> Result<String> {
-        println!("LOG: restart {}", job_name);
         self.stop(job_name, target_process)?;
         self.start(job_name, target_process)?;
         Ok(format!("{job_name} is restarted successfully!"))
@@ -309,10 +310,12 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                return Err(Error::StopJobFail(format!(
+                let error_message = Error::StopJobFail(format!(
                     "Target index must be inferior to {}",
                     self.num_procs
-                )));
+                ));
+                log(&error_message.to_string());
+                return Err(error_message);
             }
         }
         for i in start_index..end_index {
@@ -347,10 +350,12 @@ impl Job {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                return Err(Error::StatusJobFail(format!(
+                let error_message = Error::StatusJobFail(format!(
                     "Target index must be inferior to {}",
                     self.num_procs
-                )));
+                ));
+                log(&error_message.to_string());
+                return Err(error_message);
             }
         }
         let mut return_message: String = format!("\nProgram: {job_name:^3}");
