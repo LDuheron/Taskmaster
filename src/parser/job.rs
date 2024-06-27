@@ -1,3 +1,4 @@
+use crate::logger::log;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
@@ -168,7 +169,6 @@ impl Clone for Job {
     }
 }
 
-// this don't check for processes
 impl PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
@@ -211,6 +211,9 @@ impl Job {
 
         for i in start_index..end_index {
             if self.processes[i].can_start() == false {
+                log(&format!(
+                    "{job_name}:{i} is in a state where it can't start"
+                ));
                 eprintln!("{job_name}:{i} is in a state where it can't start");
                 continue;
             }
@@ -223,7 +226,6 @@ impl Job {
                 command.envs(environment);
             }
 
-            // Move -> prend l'ownership de config_umask
             if let Some(config_umask) = self.umask {
                 unsafe {
                     command.pre_exec(move || {
@@ -275,6 +277,7 @@ impl Job {
                     self.processes[i as usize].nb_retries += 1;
                     self.processes[i as usize].child = Some(child_process);
                     self.processes[i as usize].set_state(ProcessStates::Starting);
+                    log(&format!("{job_name}:{i} is now in STARTING state"));
                     println!("LOG: {job_name}:{i} is now in STARTING state");
                 }
                 Err(e) => return Err(Error::StartJobFail(e.to_string())),
@@ -315,6 +318,7 @@ impl Job {
         for i in start_index..end_index {
             let process: &mut ProcessInfo = &mut self.processes[i as usize];
             if process.can_stop() == false {
+                log(&format!("{job_name}:{i} is in a state where it can't stop"));
                 eprintln!("{job_name}:{i} is in a state where it can't stop");
                 continue;
             }
@@ -323,6 +327,7 @@ impl Job {
                 kill(child_id, self.stop_signal.to_owned() as i32);
             }
             self.processes[i].set_state(ProcessStates::Stopping);
+            log(&format!("{job_name}:{i} is now in STOPPING state"));
             println!("LOG: {job_name}:{i} is now in STOPPING state");
         }
         Ok(format!("{job_name} is stopped successfully!"))
@@ -358,6 +363,9 @@ impl Job {
         let child: &mut Child = if let Some(c) = &mut process.child {
             c
         } else {
+            log(&format!(
+                "{job_name}:{process_index} Unexpected error while starting"
+            ));
             panic!("Why process state is STARTING but child is NONE ????");
         };
         match child.try_wait() {
@@ -370,10 +378,17 @@ impl Job {
                 if process.state_changed_at.elapsed().as_secs() >= self.start_secs as u64 {
                     process.nb_retries = 0;
                     process.set_state(ProcessStates::Running);
+                    log(&format!(
+                        "{job_name}:{process_index} is now in RUNNING state"
+                    ));
                     println!("LOG: {job_name}:{process_index} is now in RUNNING state");
                 }
             }
-            Err(e) => println!("Error attempting to wait: {e}"),
+            Err(e) => {
+                log(&format!(
+                    "{job_name}:{process_index} Error attempting to wait: {e}"
+                ));
+            }
         }
     }
 
@@ -389,6 +404,7 @@ impl Job {
         process.nb_retries = 0;
         process.child = None;
         process.set_state(ProcessStates::Fatal);
+        log(&format!("{job_name}:{process_index} is now in FATAL state"));
         println!("LOG: {job_name}:{process_index} is now in FATAL state");
     }
 
@@ -397,12 +413,18 @@ impl Job {
         let child: &mut Child = if let Some(c) = &mut process.child {
             c
         } else {
+            log(&format!(
+                "{job_name}:{process_index} Unexpected error while stopping"
+            ));
             panic!("Why process state is STOPPING but child is NONE ????");
         };
         match child.try_wait() {
             Ok(Some(_)) => {
                 process.set_state(ProcessStates::Stopped);
                 process.child = None;
+                log(&format!(
+                    "{job_name}:{process_index} is now in STOPPED state"
+                ));
                 println!("LOG: {job_name}:{process_index} is now in STOPPED state");
             }
             Ok(None) => {
@@ -410,7 +432,11 @@ impl Job {
                     let _ = child.kill();
                 }
             }
-            Err(e) => eprintln!("Error attempting to wait: {e}"),
+            Err(e) => {
+                log(&format!(
+                    "{job_name}:{process_index} Error attempting to wait: {e}"
+                ));
+            }
         }
     }
 
@@ -419,19 +445,32 @@ impl Job {
         let child: &mut Child = if let Some(c) = &mut process.child {
             c
         } else {
+            log(&format!(
+                "{job_name}:{process_index} Unexpected error while running"
+            ));
             panic!("Why process state is RUNNING but child is NONE ????");
         };
         match child.try_wait() {
             Ok(Some(status)) if status.code().is_none() => {
                 // terminated by signal
                 process.set_state(ProcessStates::Stopped);
+                log(&format!(
+                    "{job_name}:{process_index} is now in STOPPED state"
+                ));
                 println!("LOG: {job_name}:{process_index} is now in STOPPED state");
             }
             Ok(Some(_)) => {
                 process.set_state(ProcessStates::Exited);
+                log(&format!(
+                    "{job_name}:{process_index} is now in EXITED state"
+                ));
                 println!("LOG: {job_name}:{process_index} is now in EXITED state");
             }
-            Err(e) => eprintln!("Error attempting to wait: {e}"),
+            Err(e) => {
+                log(&format!(
+                    "{job_name}:{process_index} Error attempting to wait: {e}"
+                ));
+            }
             _ => return,
         }
     }
@@ -445,6 +484,9 @@ impl Job {
         };
         match child.try_wait() {
             Ok(Some(status)) if status.code().is_none() => {
+                log(&format!(
+                    "{job_name}:{process_index} Unexpected error while exiting"
+                ));
                 panic!("Why process state is EXITED but it's terminated by SIGNAL ????");
             }
             Ok(Some(status)) => {
@@ -459,6 +501,9 @@ impl Job {
             }
             Err(e) => eprintln!("Error attempting to wait: {e}"),
             Ok(None) => {
+                log(&format!(
+                    "{job_name}:{process_index} Unexpected error while exiting"
+                ));
                 panic!("Why process state is EXITED but process is not TERMINATED ????")
             }
         }

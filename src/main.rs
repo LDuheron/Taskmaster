@@ -6,10 +6,13 @@ use error::{Error, Result};
 use logger::Logger;
 use parser::config::Config;
 use std::env::args;
+use std::fmt::format;
 use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
 use std::thread::sleep;
 use std::time::Duration;
+
+use crate::logger::log;
 
 const SIGHUP: i32 = 1;
 static mut RELOAD_CONFIG: bool = false;
@@ -29,8 +32,14 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     unsafe {
         if RELOAD_CONFIG {
             match config.reload_config(&config_file) {
-                Err(e) => println!("log: can't reload file: {e}"),
-                Ok(()) => println!("log: config file is reloaded:"), // \n{:#?}", config),
+                Err(e) => {
+                    log(&format!("Can't reload file: {e}"));
+                    eprintln!("log: can't reload file: {e}")
+                }
+                Ok(()) => {
+                    log(&format!("Config file is reloaded"));
+                    println!("log: config file is reloaded:"); // \n{:#?}", config),
+                }
             }
             RELOAD_CONFIG = false;
         }
@@ -55,7 +64,7 @@ fn parse_arg_from_client_input(raw: &String) -> Result<String> {
             Ok(cmd.to_string())
         }
     } else {
-        Err(Error::WrongClientInputFormat) // repondre au client
+        Err(Error::WrongClientInputFormat)
     }
 }
 
@@ -152,7 +161,6 @@ fn init_connection(ip: String, port: String) -> Result<TcpListener> {
     listener
         .set_nonblocking(true)
         .map_err(|err| Error::Default(err.to_string()))?;
-    println!("bind ok");
     Ok(listener)
 }
 
@@ -163,7 +171,7 @@ fn main() -> Result<()> {
         )));
     }
     unsafe {
-        LOGGER.init("log.txt")?;
+        LOGGER.init("taskmaster.log")?;
     }
     let config_file: String = args().nth(1).unwrap();
     let mut config: Config = Config::new();
