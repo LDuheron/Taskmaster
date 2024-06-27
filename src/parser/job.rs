@@ -212,7 +212,7 @@ impl Job {
         for i in start_index..end_index {
             if self.processes[i].can_start() == false {
                 log(&format!(
-                    "{job_name}:{i} is in a state where it can't start"
+                    "INFO: {job_name}:{i} is in a state where it can't start"
                 ));
                 eprintln!("{job_name}:{i} is in a state where it can't start");
                 continue;
@@ -277,7 +277,7 @@ impl Job {
                     self.processes[i as usize].nb_retries += 1;
                     self.processes[i as usize].child = Some(child_process);
                     self.processes[i as usize].set_state(ProcessStates::Starting);
-                    log(&format!("{job_name}:{i} is now in STARTING state"));
+                    log(&format!("INFO: {job_name}:{i} is now in STARTING state"));
                     println!("LOG: {job_name}:{i} is now in STARTING state");
                 }
                 Err(e) => return Err(Error::StartJobFail(e.to_string())),
@@ -318,7 +318,9 @@ impl Job {
         for i in start_index..end_index {
             let process: &mut ProcessInfo = &mut self.processes[i as usize];
             if process.can_stop() == false {
-                log(&format!("{job_name}:{i} is in a state where it can't stop"));
+                log(&format!(
+                    "INFO: {job_name}:{i} is in a state where it can't stop"
+                ));
                 eprintln!("{job_name}:{i} is in a state where it can't stop");
                 continue;
             }
@@ -327,7 +329,7 @@ impl Job {
                 kill(child_id, self.stop_signal.to_owned() as i32);
             }
             self.processes[i].set_state(ProcessStates::Stopping);
-            log(&format!("{job_name}:{i} is now in STOPPING state"));
+            log(&format!("INFO: {job_name}:{i} is now in STOPPING state"));
             println!("LOG: {job_name}:{i} is now in STOPPING state");
         }
         Ok(format!("{job_name} is stopped successfully!"))
@@ -364,7 +366,7 @@ impl Job {
             c
         } else {
             log(&format!(
-                "{job_name}:{process_index} Unexpected error while starting"
+                "FATAL: {job_name}:{process_index} Unexpected error while starting"
             ));
             panic!("Why process state is STARTING but child is NONE ????");
         };
@@ -379,14 +381,14 @@ impl Job {
                     process.nb_retries = 0;
                     process.set_state(ProcessStates::Running);
                     log(&format!(
-                        "{job_name}:{process_index} is now in RUNNING state"
+                        "INFO: {job_name}:{process_index} is now in RUNNING state"
                     ));
                     println!("LOG: {job_name}:{process_index} is now in RUNNING state");
                 }
             }
             Err(e) => {
                 log(&format!(
-                    "{job_name}:{process_index} Error attempting to wait: {e}"
+                    "ERROR: {job_name}:{process_index} Error attempting to wait: {e}"
                 ));
             }
         }
@@ -404,7 +406,9 @@ impl Job {
         process.nb_retries = 0;
         process.child = None;
         process.set_state(ProcessStates::Fatal);
-        log(&format!("{job_name}:{process_index} is now in FATAL state"));
+        log(&format!(
+            "INFO: {job_name}:{process_index} is now in FATAL state"
+        ));
         println!("LOG: {job_name}:{process_index} is now in FATAL state");
     }
 
@@ -414,7 +418,7 @@ impl Job {
             c
         } else {
             log(&format!(
-                "{job_name}:{process_index} Unexpected error while stopping"
+                "FATAL: {job_name}:{process_index} Unexpected error while stopping"
             ));
             panic!("Why process state is STOPPING but child is NONE ????");
         };
@@ -423,7 +427,7 @@ impl Job {
                 process.set_state(ProcessStates::Stopped);
                 process.child = None;
                 log(&format!(
-                    "{job_name}:{process_index} is now in STOPPED state"
+                    "INFO: {job_name}:{process_index} is now in STOPPED state"
                 ));
                 println!("LOG: {job_name}:{process_index} is now in STOPPED state");
             }
@@ -434,7 +438,7 @@ impl Job {
             }
             Err(e) => {
                 log(&format!(
-                    "{job_name}:{process_index} Error attempting to wait: {e}"
+                    "ERROR: {job_name}:{process_index} Error attempting to wait: {e}"
                 ));
             }
         }
@@ -446,7 +450,7 @@ impl Job {
             c
         } else {
             log(&format!(
-                "{job_name}:{process_index} Unexpected error while running"
+                "FATAL: {job_name}:{process_index} Unexpected error while running"
             ));
             panic!("Why process state is RUNNING but child is NONE ????");
         };
@@ -455,20 +459,20 @@ impl Job {
                 // terminated by signal
                 process.set_state(ProcessStates::Stopped);
                 log(&format!(
-                    "{job_name}:{process_index} is now in STOPPED state"
+                    "INFO: {job_name}:{process_index} is now in STOPPED state"
                 ));
                 println!("LOG: {job_name}:{process_index} is now in STOPPED state");
             }
             Ok(Some(_)) => {
                 process.set_state(ProcessStates::Exited);
                 log(&format!(
-                    "{job_name}:{process_index} is now in EXITED state"
+                    "INFO: {job_name}:{process_index} is now in EXITED state"
                 ));
                 println!("LOG: {job_name}:{process_index} is now in EXITED state");
             }
             Err(e) => {
                 log(&format!(
-                    "{job_name}:{process_index} Error attempting to wait: {e}"
+                    "ERROR: {job_name}:{process_index} Error attempting to wait: {e}"
                 ));
             }
             _ => return,
@@ -485,7 +489,7 @@ impl Job {
         match child.try_wait() {
             Ok(Some(status)) if status.code().is_none() => {
                 log(&format!(
-                    "{job_name}:{process_index} Unexpected error while exiting"
+                    "FATAL: {job_name}:{process_index} Unexpected error while exiting"
                 ));
                 panic!("Why process state is EXITED but it's terminated by SIGNAL ????");
             }
@@ -499,10 +503,14 @@ impl Job {
                     let _ = self.start(job_name, Some(process_index));
                 }
             }
-            Err(e) => eprintln!("Error attempting to wait: {e}"),
+            Err(e) => {
+                log(&format!(
+                    "ERROR: {job_name}:{process_index} Error attempting to wait: {e}"
+                ));
+            }
             Ok(None) => {
                 log(&format!(
-                    "{job_name}:{process_index} Unexpected error while exiting"
+                    "FATAL: {job_name}:{process_index} Unexpected error while exiting"
                 ));
                 panic!("Why process state is EXITED but process is not TERMINATED ????")
             }

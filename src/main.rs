@@ -2,6 +2,7 @@ mod error;
 mod logger;
 mod parser;
 
+use crate::logger::log;
 use error::{Error, Result};
 use logger::Logger;
 use parser::config::Config;
@@ -10,8 +11,6 @@ use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
 use std::thread::sleep;
 use std::time::Duration;
-
-use crate::logger::log;
 
 const SIGHUP: i32 = 1;
 static mut RELOAD_CONFIG: bool = false;
@@ -32,11 +31,11 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
         if RELOAD_CONFIG {
             match config.reload_config(&config_file) {
                 Err(e) => {
-                    log(&format!("Can't reload file: {e}"));
+                    log(&format!("ERROR: Can't reload file: {e}"));
                     eprintln!("log: can't reload file: {e}")
                 }
                 Ok(()) => {
-                    log(&format!("Config file is reloaded"));
+                    log(&format!("INFO: Config file is reloaded"));
                     println!("log: config file is reloaded:"); // \n{:#?}", config),
                 }
             }
