@@ -22,6 +22,7 @@ pub enum Error {
     FieldCommandIsNotSet,
     WrongClientInputFormat,
     CantParseEnvEntry(String),
+    CantOpenLogFile(String),
     CommandIsNotSuported(String),
     IO(String),
     StartJobFail(String),

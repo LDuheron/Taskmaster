@@ -1,7 +1,10 @@
 mod error;
+mod logger;
 mod parser;
 
+use crate::logger::log;
 use error::{Error, Result};
+use logger::Logger;
 use parser::config::Config;
 use std::env::args;
 use std::io::{prelude::*, ErrorKind};
@@ -11,6 +14,7 @@ use std::time::Duration;
 
 const SIGHUP: i32 = 1;
 static mut RELOAD_CONFIG: bool = false;
+static mut LOGGER: Logger = Logger::new();
 
 extern "C" {
     pub fn signal(signum: i32, handler: usize) -> u32;
@@ -26,8 +30,12 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     unsafe {
         if RELOAD_CONFIG {
             match config.reload_config(&config_file) {
-                Err(e) => println!("log: can't reload file: {e}"),
-                Ok(()) => println!("log: config file is reloaded:"), // \n{:#?}", config),
+                Err(e) => {
+                    log(&format!("ERROR: Can't reload file: {e}"));
+                }
+                Ok(()) => {
+                    log(&format!("INFO: Config file is reloaded"));
+                }
             }
             RELOAD_CONFIG = false;
         }
@@ -52,7 +60,7 @@ fn parse_arg_from_client_input(raw: &String) -> Result<String> {
             Ok(cmd.to_string())
         }
     } else {
-        Err(Error::WrongClientInputFormat) // repondre au client
+        Err(Error::WrongClientInputFormat)
     }
 }
 
@@ -155,7 +163,6 @@ fn init_connection(ip: String, port: String) -> Result<TcpListener> {
     listener
         .set_nonblocking(true)
         .map_err(|err| Error::Default(err.to_string()))?;
-    println!("bind ok");
     Ok(listener)
 }
 
@@ -164,6 +171,9 @@ fn main() -> Result<()> {
         return Err(Error::BadNumberOfArguments(String::from(
             "usage: taskmaster config_file",
         )));
+    }
+    unsafe {
+        LOGGER.init("taskmaster.log")?;
     }
     let config_file: String = args().nth(1).unwrap();
     let mut config: Config = Config::new();
