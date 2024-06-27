@@ -374,7 +374,9 @@ impl Job {
             Ok(Some(_)) => {
                 process.set_state(ProcessStates::Backoff);
                 process.child = None;
-                log(&format!("INFO: {job_name}:{process_index} is now in BACKOFF state"));
+                log(&format!(
+                    "INFO: {job_name}:{process_index} is now in BACKOFF state"
+                ));
                 println!("LOG: {job_name}:{process_index} is now in BACKOFF state");
             }
             Ok(None) => {
