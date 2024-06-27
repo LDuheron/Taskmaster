@@ -214,7 +214,7 @@ impl Job {
                 log(&format!(
                     "INFO: {job_name}:{i} is in a state where it can't start"
                 ));
-                eprintln!("{job_name}:{i} is in a state where it can't start");
+                println!("{job_name}:{i} is in a state where it can't start");
                 continue;
             }
             let mut command = Command::new(&self.command);
@@ -321,7 +321,7 @@ impl Job {
                 log(&format!(
                     "INFO: {job_name}:{i} is in a state where it can't stop"
                 ));
-                eprintln!("{job_name}:{i} is in a state where it can't stop");
+                println!("{job_name}:{i} is in a state where it can't stop");
                 continue;
             }
             let child_id: u32 = process.child.as_ref().unwrap().id();
