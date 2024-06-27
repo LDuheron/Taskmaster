@@ -27,6 +27,7 @@ pub enum Error {
     IO(String),
     StartJobFail(String),
     StopJobFail(String),
+    StatusJobFail(String),
     Default(String),
 }
 
