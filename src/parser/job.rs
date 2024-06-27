@@ -12,14 +12,10 @@ extern "C" {
     fn kill(pid: u32, signal: i32);
 }
 
-<<<<<<< HEAD
 extern "C" {
     pub fn umask(mask: u32) -> u32;
 }
 
-#[allow(dead_code)]
-=======
->>>>>>> main
 #[derive(Debug, PartialEq, Clone)]
 pub enum AutorestartOptions {
     Always,
@@ -122,14 +118,9 @@ pub struct Job {
     pub stdout_file: Option<String>,
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
-<<<<<<< HEAD
     pub umask: Option<u32>,
     // TODO
-    pub processes: Option<HashMap<u32, Child>>,
-=======
-    pub umask: Option<String>,
     pub processes: Vec<ProcessInfo>,
->>>>>>> main
 }
 
 impl Default for Job {
@@ -172,14 +163,8 @@ impl Clone for Job {
             stdout_file: self.stdout_file.clone(),
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
-<<<<<<< HEAD
             umask: self.umask,
-            // TODO
-            processes: None,
-=======
-            umask: self.umask.clone(),
             processes: vec![ProcessInfo::default(); self.num_procs as usize],
->>>>>>> main
         }
     }
 }

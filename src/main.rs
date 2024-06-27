@@ -56,19 +56,11 @@ fn parse_arg_from_client_input(raw: &String) -> Result<String> {
     }
 }
 
-<<<<<<< HEAD
-fn parse_target_process_number_from_client_input(raw: &String) -> Result<Option<u32>> {
-    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        if let Some(index) = cmd.rfind(":") {
-            let split_cmd = &cmd[index + 1..];
-            if let Ok(number) = split_cmd.parse::<u32>() {
-=======
 fn parse_target_process_number_from_client_input(raw: &String) -> Result<Option<usize>> {
     if let Some(cmd) = raw.split_whitespace().skip(1).next() {
         if let Some(index) = cmd.rfind(":") {
             let split_cmd = &cmd[index + 1..];
             if let Ok(number) = split_cmd.parse::<usize>() {
->>>>>>> main
                 return Ok(Some(number));
             } else {
                 return Err(Error::WrongClientInputFormat);
