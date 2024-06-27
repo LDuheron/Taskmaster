@@ -1,5 +1,4 @@
 use super::job::{AutorestartOptions, Job, ProcessInfo, StopSignals};
-use crate::logger::log;
 use crate::{Error, Result};
 use configparser::ini::Ini;
 use std::{any::type_name, collections::HashMap, str::FromStr};
