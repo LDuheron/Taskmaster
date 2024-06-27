@@ -101,6 +101,16 @@ impl Config {
             self.map.insert(entry_name, job);
         }
         self.map.remove("default");
+        if self
+            .map
+            .keys()
+            .filter(|k| k.chars().all(char::is_alphanumeric))
+            .collect::<Vec<&String>>()
+            .len()
+            != self.map.len()
+        {
+            return Err(Error::JobEntryNameWithNonAlphanumChar);
+        }
         if self.map.is_empty() {
             return Err(Error::NoJobEntry);
         }
