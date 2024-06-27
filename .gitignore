@@ -4,3 +4,6 @@ target/
 .vscode
 .vagrant
 log.txt
+err
+out
+a.out

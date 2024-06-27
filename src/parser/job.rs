@@ -1,9 +1,21 @@
+use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
+use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+use std::time::Instant;
 
-#[allow(dead_code)]
+use crate::error::{Error, Result};
+
+extern "C" {
+    fn kill(pid: u32, signal: i32);
+}
+
+extern "C" {
+    pub fn umask(mask: u32) -> u32;
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum AutorestartOptions {
     Always,
@@ -11,7 +23,6 @@ pub enum AutorestartOptions {
     UnexpectedExit,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum StopSignals {
     HUP = 1,
@@ -23,6 +34,74 @@ pub enum StopSignals {
     TERM = 15,
 }
 
+// http://supervisord.org/subprocess.html#process-states
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ProcessStates {
+    Stopped,
+    Stopping,
+    Starting,
+    Running,
+    Exited,
+    Fatal,
+    Backoff,
+}
+
+#[derive(Debug)]
+pub struct ProcessInfo {
+    pub child: Option<Child>,
+    pub state_changed_at: Instant,
+    pub state: ProcessStates,
+    pub nb_retries: u32,
+}
+
+impl Default for ProcessInfo {
+    fn default() -> Self {
+        ProcessInfo {
+            child: None,
+            state_changed_at: Instant::now(),
+            state: ProcessStates::Stopped,
+            nb_retries: 0,
+        }
+    }
+}
+
+impl Clone for ProcessInfo {
+    fn clone(&self) -> Self {
+        ProcessInfo {
+            child: None,
+            state_changed_at: self.state_changed_at,
+            state: self.state,
+            nb_retries: 0,
+        }
+    }
+}
+
+impl ProcessInfo {
+    pub fn set_state(self: &mut Self, state: ProcessStates) {
+        self.state = state;
+        self.state_changed_at = Instant::now();
+    }
+
+    pub fn can_start(self: &Self) -> bool {
+        match self.state {
+            ProcessStates::Stopped => true,
+            ProcessStates::Fatal => true,
+            ProcessStates::Exited => true,
+            ProcessStates::Backoff => true,
+            _ => false,
+        }
+    }
+
+    pub fn can_stop(self: &Self) -> bool {
+        match self.state {
+            ProcessStates::Running => true,
+            ProcessStates::Starting => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Job {
     pub command: String,
@@ -30,7 +109,7 @@ pub struct Job {
     pub num_procs: u32,
     pub auto_start: bool,
     pub auto_restart: AutorestartOptions,
-    pub exit_codes: Vec<u8>,
+    pub exit_codes: Vec<i32>,
     pub start_secs: u32,
     pub start_retries: u32,
     pub stop_signal: StopSignals,
@@ -39,9 +118,8 @@ pub struct Job {
     pub stdout_file: Option<String>,
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
-    pub umask: Option<String>,
-    // TODO
-    pub processes: Option<HashMap<u32, Child>>,
+    pub umask: Option<u32>,
+    pub processes: Vec<ProcessInfo>,
 }
 
 impl Default for Job {
@@ -50,9 +128,9 @@ impl Default for Job {
             command: String::new(),
             arguments: None,
             num_procs: 1,
-            auto_start: true,
+            auto_start: false,
             auto_restart: AutorestartOptions::UnexpectedExit,
-            exit_codes: vec![1],
+            exit_codes: vec![0],
             start_secs: 1,
             start_retries: 3,
             stop_signal: StopSignals::TERM,
@@ -62,8 +140,7 @@ impl Default for Job {
             environment: None,
             work_dir: None,
             umask: None,
-            // TODO
-            processes: None,
+            processes: vec![ProcessInfo::default()],
         }
     }
 }
@@ -85,14 +162,14 @@ impl Clone for Job {
             stdout_file: self.stdout_file.clone(),
             environment: self.environment.clone(),
             work_dir: self.work_dir.clone(),
-            umask: self.umask.clone(),
-            // TODO
-            processes: None,
+            umask: self.umask,
+            processes: vec![ProcessInfo::default(); self.num_procs as usize],
         }
     }
 }
 
-impl std::cmp::PartialEq for Job {
+// this don't check for processes
+impl PartialEq for Job {
     fn eq(&self, other: &Self) -> bool {
         self.command == other.command
             && self.arguments == other.arguments
@@ -109,34 +186,35 @@ impl std::cmp::PartialEq for Job {
             && self.environment == other.environment
             && self.work_dir == other.work_dir
             && self.umask == other.umask
-        // TODO
-        // && self.processes == other.processes
     }
 }
 
 impl Job {
-    pub fn start(self: &mut Self, job_name: &String, target_process: Option<u32>) {
-        println!("log: start {}", job_name);
-
-        let mut start_index = 0;
-        let mut end_index = self.num_procs;
+    pub fn start(
+        self: &mut Self,
+        job_name: &String,
+        target_process: Option<usize>,
+    ) -> Result<String> {
+        let mut start_index: usize = 0;
+        let mut end_index: usize = self.num_procs as usize;
         if let Some(nb) = target_process {
-            if nb < self.num_procs {
+            if nb < self.num_procs as usize {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                eprintln!(
-                    "Target index must be inferior or equal to {:?}",
+                return Err(Error::StartJobFail(format!(
+                    "Target index must be inferior to {:?}",
                     self.num_procs
-                );
-                return;
+                )));
             }
         }
 
         for i in start_index..end_index {
+            if self.processes[i].can_start() == false {
+                eprintln!("{job_name}:{i} is in a state where it can't start");
+                continue;
+            }
             let mut command = Command::new(&self.command);
-
-            // TODO : modifier le if pour cibler le process[i]
             if let Some(args) = &self.arguments {
                 command.args(args);
             }
@@ -145,25 +223,24 @@ impl Job {
                 command.envs(environment);
             }
 
-            // if let Some(ref config_umask) = self.umask {
-            //     match command.pre_exec( || {
-            //         unsafe { libc::umask(config_umask) }; // checker si c'est le bon input
-            //     }) {
-            //         Ok(_) => {}
-            //         Err(e) => {
-            //             eprintln!("Error: {:?}", e);
-            //             return;
-            //         }
-            //     }
-            // }
+            // Move -> prend l'ownership de config_umask
+            if let Some(config_umask) = self.umask {
+                unsafe {
+                    command.pre_exec(move || {
+                        umask(config_umask);
+                        Ok(())
+                    });
+                }
+            }
 
             if let Some(ref work_dir) = self.work_dir {
                 let path = Path::new(work_dir);
                 if path.is_dir() == true {
                     command.current_dir(work_dir);
                 } else {
-                    eprintln!("Error: {:?}", work_dir);
-                    return;
+                    return Err(Error::StartJobFail(format!(
+                        "{work_dir} is not a directory!"
+                    )));
                 }
             }
 
@@ -176,10 +253,7 @@ impl Job {
                     Ok(file) => {
                         command.stderr(Stdio::from(file));
                     }
-                    Err(e) => {
-                        eprintln!("Error: {:?}", e);
-                        return;
-                    }
+                    Err(e) => return Err(Error::StartJobFail(e.to_string())),
                 }
             }
 
@@ -192,84 +266,200 @@ impl Job {
                     Ok(file) => {
                         command.stdout(Stdio::from(file));
                     }
-                    Err(e) => {
-                        eprintln!("Error: {:?}", e);
-                        return;
-                    }
+                    Err(e) => return Err(Error::StartJobFail(e.to_string())),
                 }
             }
 
             match command.spawn() {
                 Ok(child_process) => {
-                    if let Some(ref mut map) = self.processes {
-                        map.insert(i, child_process);
-                        println!();
-                    } else {
-                        // TODO : modify to the new vector
-                        let mut map: HashMap<u32, Child> = HashMap::new();
-                        map.insert(i, child_process);
-                        self.processes = Some(map);
-                    }
+                    self.processes[i as usize].nb_retries += 1;
+                    self.processes[i as usize].child = Some(child_process);
+                    self.processes[i as usize].set_state(ProcessStates::Starting);
+                    println!("LOG: {job_name}:{i} is now in STARTING state");
                 }
-                Err(e) => {
-                    eprintln!("Failed to start process: {:?}", e);
-                }
+                Err(e) => return Err(Error::StartJobFail(e.to_string())),
             }
         }
+        Ok(format!("{job_name} is started successfully!"))
     }
 
-    pub fn restart(self: &mut Self, job_name: &String, target_process: Option<u32>) {
-        println!("log: restart {}", job_name);
-        self.stop(job_name, target_process);
-        self.start(job_name, target_process);
+    pub fn restart(
+        self: &mut Self,
+        job_name: &String,
+        target_process: Option<usize>,
+    ) -> Result<String> {
+        println!("LOG: restart {}", job_name);
+        self.stop(job_name, target_process)?;
+        self.start(job_name, target_process)?;
+        Ok(format!("{job_name} is restarted successfully!"))
     }
 
-    pub fn stop(self: &mut Self, job_name: &String, target_process: Option<u32>) {
-        println!("log: stop {}", job_name);
-
-        let mut start_index = 0;
-        let mut end_index = self.num_procs;
+    pub fn stop(
+        self: &mut Self,
+        job_name: &String,
+        target_process: Option<usize>,
+    ) -> Result<String> {
+        let mut start_index: usize = 0;
+        let mut end_index: usize = self.num_procs as usize;
         if let Some(nb) = target_process {
-            if nb < self.num_procs {
+            if nb < self.num_procs as usize {
                 start_index = nb;
                 end_index = nb + 1;
             } else {
-                eprintln!(
-                    "Target index must be inferior or equal to {:?}",
+                return Err(Error::StopJobFail(format!(
+                    "Target index must be inferior to {}",
                     self.num_procs
-                );
-                return;
+                )));
             }
         }
+        for i in start_index..end_index {
+            let process: &mut ProcessInfo = &mut self.processes[i as usize];
+            if process.can_stop() == false {
+                eprintln!("{job_name}:{i} is in a state where it can't stop");
+                continue;
+            }
+            let child_id: u32 = process.child.as_ref().unwrap().id();
+            unsafe {
+                kill(child_id, self.stop_signal.to_owned() as i32);
+            }
+            self.processes[i].set_state(ProcessStates::Stopping);
+            println!("LOG: {job_name}:{i} is now in STOPPING state");
+        }
+        Ok(format!("{job_name} is stopped successfully!"))
+    }
 
-        if let Some(ref mut map) = self.processes {
-            for i in start_index..end_index {
-                if let Some(mut child) = map.remove(&i) {
-                    println!("Process is running.");
-                    // Functional version
-                    match child.kill() {
-                        Ok(_) => {
-                            println!("Process is dead.");
-                        }
-                        Err(e) => {
-                            eprint!("{:?}", e)
-                        }
-                    }
+    pub fn stop_job_now(self: &mut Self) {
+        for p in self.processes.iter_mut() {
+            if let Some(c) = &mut p.child {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+        }
+    }
 
-                    // let mut child_id: u32 = child.id();
+    // from http://supervisord.org/subprocess.html#process-states
+    pub fn processes_routine(self: &mut Self, job_name: &String) {
+        let nb_processes: usize = self.num_procs as usize;
+        for process_index in 0..nb_processes {
+            match self.processes[process_index].state {
+                ProcessStates::Starting => self._handle_starting(process_index, job_name),
+                ProcessStates::Backoff => self._handle_backoff(process_index, job_name),
+                ProcessStates::Stopping => self._handle_stopping(process_index, job_name),
+                ProcessStates::Running => self._handle_running(process_index, job_name),
+                ProcessStates::Exited => self._handle_exited(process_index, job_name),
+                // fatal and stopped need user interaction to change
+                _ => continue,
+            };
+        }
+    }
 
-                    // if let Some(mut signal) = self.stop_signal {
-                    //     unsafe {
-                    //         kill(child_id, signal);
-                    //     }
-                    // }
-                    // else {
-                    // 	unsafe {
-                    //         kill(child_id, SIGTERM);
-                    //     }
-                    // }
-                    // map.remove(&0);
+    fn _handle_starting(self: &mut Self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        let child: &mut Child = if let Some(c) = &mut process.child {
+            c
+        } else {
+            panic!("Why process state is STARTING but child is NONE ????");
+        };
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                process.set_state(ProcessStates::Backoff);
+                process.child = None;
+                println!("LOG: {job_name}:{process_index} is now in BACKOFF state");
+            }
+            Ok(None) => {
+                if process.state_changed_at.elapsed().as_secs() >= self.start_secs as u64 {
+                    process.nb_retries = 0;
+                    process.set_state(ProcessStates::Running);
+                    println!("LOG: {job_name}:{process_index} is now in RUNNING state");
                 }
+            }
+            Err(e) => println!("Error attempting to wait: {e}"),
+        }
+    }
+
+    fn _handle_backoff(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        if process.nb_retries < self.start_retries {
+            if (process.state_changed_at.elapsed().as_secs() as u32) < process.nb_retries {
+                return;
+            }
+            let _ = self.start(job_name, Some(process_index));
+            return;
+        }
+        process.nb_retries = 0;
+        process.child = None;
+        process.set_state(ProcessStates::Fatal);
+        println!("LOG: {job_name}:{process_index} is now in FATAL state");
+    }
+
+    fn _handle_stopping(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        let child: &mut Child = if let Some(c) = &mut process.child {
+            c
+        } else {
+            panic!("Why process state is STOPPING but child is NONE ????");
+        };
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                process.set_state(ProcessStates::Stopped);
+                process.child = None;
+                println!("LOG: {job_name}:{process_index} is now in STOPPED state");
+            }
+            Ok(None) => {
+                if process.state_changed_at.elapsed().as_secs() >= self.stop_wait_secs as u64 {
+                    let _ = child.kill();
+                }
+            }
+            Err(e) => eprintln!("Error attempting to wait: {e}"),
+        }
+    }
+
+    fn _handle_running(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        let child: &mut Child = if let Some(c) = &mut process.child {
+            c
+        } else {
+            panic!("Why process state is RUNNING but child is NONE ????");
+        };
+        match child.try_wait() {
+            Ok(Some(status)) if status.code().is_none() => {
+                // terminated by signal
+                process.set_state(ProcessStates::Stopped);
+                println!("LOG: {job_name}:{process_index} is now in STOPPED state");
+            }
+            Ok(Some(_)) => {
+                process.set_state(ProcessStates::Exited);
+                println!("LOG: {job_name}:{process_index} is now in EXITED state");
+            }
+            Err(e) => eprintln!("Error attempting to wait: {e}"),
+            _ => return,
+        }
+    }
+
+    fn _handle_exited(&mut self, process_index: usize, job_name: &String) {
+        let process: &mut ProcessInfo = &mut self.processes[process_index];
+        let child: &mut Child = if let Some(c) = &mut process.child {
+            c
+        } else {
+            return;
+        };
+        match child.try_wait() {
+            Ok(Some(status)) if status.code().is_none() => {
+                panic!("Why process state is EXITED but it's terminated by SIGNAL ????");
+            }
+            Ok(Some(status)) => {
+                // is safe: process can't be in exited state and terminated by signal
+                let code: i32 = status.code().unwrap();
+                if self.auto_restart == AutorestartOptions::Always
+                    || (self.auto_restart == AutorestartOptions::UnexpectedExit
+                        && self.exit_codes.contains(&code) == false)
+                {
+                    let _ = self.start(job_name, Some(process_index));
+                }
+            }
+            Err(e) => eprintln!("Error attempting to wait: {e}"),
+            Ok(None) => {
+                panic!("Why process state is EXITED but process is not TERMINATED ????")
             }
         }
     }

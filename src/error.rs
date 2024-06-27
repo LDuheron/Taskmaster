@@ -2,7 +2,6 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    // -- parser
     BadNumberOfArguments(String),
     CantLoadFile(String),
     NoJobEntry,
@@ -23,7 +22,10 @@ pub enum Error {
     WrongClientInputFormat,
     CantParseEnvEntry(String),
     CantOpenLogFile(String),
+    CommandIsNotSuported(String),
     IO(String),
+    StartJobFail(String),
+    StopJobFail(String),
     Default(String),
 }
 
