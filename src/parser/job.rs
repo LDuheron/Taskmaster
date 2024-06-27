@@ -119,7 +119,6 @@ pub struct Job {
     pub environment: Option<HashMap<String, String>>,
     pub work_dir: Option<String>,
     pub umask: Option<u32>,
-    // TODO
     pub processes: Vec<ProcessInfo>,
 }
 
