@@ -13,10 +13,10 @@ pub fn parse_client_input(
     let client_cmd = _parse_cmd_from_client_input(&raw)?;
     let client_arg = _parse_arg_from_client_input(&raw)?;
     let client_process = _parse_target_process_number_from_client_input(&raw)?;
-    if _is_job_from_config_map(config, &client_arg) {
+    if config.contains_key(&client_arg) {
         Ok((client_cmd, client_arg, client_process))
     } else {
-        Err(Error::WrongClientInputFormat)
+        Err(Error::ParseClientInput("Job not found...".into()))
     }
 }
 
@@ -48,7 +48,7 @@ fn _parse_cmd_from_client_input(raw: &String) -> Result<String> {
     if let Some(cmd) = raw.split_whitespace().next() {
         Ok(cmd.to_string())
     } else {
-        Err(Error::WrongClientInputFormat)
+        Err(Error::ParseClientInput("Command is not set...".into()))
     }
 }
 
@@ -62,7 +62,7 @@ fn _parse_arg_from_client_input(raw: &String) -> Result<String> {
             Ok(cmd.to_string())
         }
     } else {
-        Err(Error::WrongClientInputFormat)
+        Err(Error::ParseClientInput("Job is not set...".into()))
     }
 }
 
@@ -73,19 +73,13 @@ fn _parse_target_process_number_from_client_input(raw: &String) -> Result<Option
             if let Ok(number) = split_cmd.parse::<usize>() {
                 return Ok(Some(number));
             } else {
-                return Err(Error::WrongClientInputFormat);
+                return Err(Error::ParseClientInput(
+                    "Wrong format for the number of process...".into(),
+                ));
             }
         }
     }
     Ok(None)
-}
-
-fn _is_job_from_config_map(config: &mut Config, cmd: &String) -> bool {
-    let result = config.contains_key(cmd);
-    if result == true {
-        return true;
-    }
-    return false;
 }
 
 fn _parse_raw_config_field<T: FromStr>(

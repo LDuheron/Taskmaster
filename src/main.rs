@@ -67,14 +67,15 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                     continue;
                 }
                 let (client_cmd, client_arg, client_process) =
-                    if let Ok((client_cmd, client_arg, client_process)) =
-                        parse_client_input(config, &formatted)
-                    {
-                        (client_cmd, client_arg, client_process)
-                    } else {
-                        s.write(b"Error while parsing the input!")
-                            .map_err(|e| Error::IO(e.to_string()))?;
-                        continue;
+                    match parse_client_input(config, &formatted) {
+                        Ok((client_cmd, client_arg, client_process)) => {
+                            (client_cmd, client_arg, client_process)
+                        }
+                        Err(e) => {
+                            s.write(&e.to_string().into_bytes())
+                                .map_err(|e| Error::IO(e.to_string()))?;
+                            continue;
+                        }
                     };
                 let job: &mut Job = config.get_mut(&client_arg).unwrap();
                 let ret = match client_cmd.as_str() {
@@ -82,7 +83,7 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                     "stop" => job.stop(&client_arg, client_process),
                     "restart" => job.restart(&client_arg, client_process),
                     "status" => job.status(&client_arg, client_process),
-                    _ => Err(Error::CommandIsNotSuported(
+                    _ => Err(Error::CommandIsNotSupported(
                         "Unknown command: Please try start, stop or restart!".into(),
                     )),
                 };
