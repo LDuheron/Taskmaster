@@ -61,7 +61,6 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                     continue;
                 }
                 let formatted = String::from_utf8_lossy(&data[..bytes_read]).into_owned();
-                println!("read: {}", formatted);
                 if formatted.trim() == "status".to_string() {
                     s.write(&config.status().into_bytes())
                         .map_err(|e| Error::IO(e.to_string()))?;
