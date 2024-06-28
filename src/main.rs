@@ -2,13 +2,13 @@ mod config;
 mod error;
 mod job;
 mod logger;
-mod parsing;
+mod parse;
 
 use config::Config;
 use error::{Error, Result};
 use job::Job;
 use logger::{log, Logger};
-use parsing::{
+use parse::{
     parse_arg_from_client_input, parse_cmd_from_client_input,
     parse_target_process_number_from_client_input,
 };

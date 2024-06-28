@@ -1,4 +1,4 @@
-use crate::parsing::parse_job;
+use crate::parse::parse_job;
 use crate::{log, Error, Job, Result};
 use configparser::ini::Ini;
 use std::collections::HashMap;
