@@ -79,12 +79,12 @@ impl Clone for ProcessInfo {
 }
 
 impl ProcessInfo {
-    pub fn set_state(self: &mut Self, state: ProcessStates) {
+    fn set_state(self: &mut Self, state: ProcessStates) {
         self.state = state;
         self.state_changed_at = Instant::now();
     }
 
-    pub fn can_start(self: &Self) -> bool {
+    fn can_start(self: &Self) -> bool {
         match self.state {
             ProcessStates::Stopped => true,
             ProcessStates::Fatal => true,
@@ -94,7 +94,7 @@ impl ProcessInfo {
         }
     }
 
-    pub fn can_stop(self: &Self) -> bool {
+    fn can_stop(self: &Self) -> bool {
         match self.state {
             ProcessStates::Running => true,
             ProcessStates::Starting => true,
@@ -393,6 +393,8 @@ impl Job {
             };
         }
     }
+
+    // Private
 
     fn _handle_starting(self: &mut Self, process_index: usize, job_name: &String) {
         let process: &mut ProcessInfo = &mut self.processes[process_index];

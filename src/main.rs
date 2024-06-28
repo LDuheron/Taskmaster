@@ -1,11 +1,14 @@
+mod config;
 mod error;
+mod job;
 mod logger;
-mod parser;
+mod parse;
 
-use crate::logger::log;
+use config::Config;
 use error::{Error, Result};
-use logger::Logger;
-use parser::config::Config;
+use job::Job;
+use logger::{log, Logger};
+use parse::parse_client_input;
 use std::env::args;
 use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
@@ -42,64 +45,6 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     }
 }
 
-fn parse_cmd_from_client_input(raw: &String) -> Result<String> {
-    if let Some(cmd) = raw.split_whitespace().next() {
-        Ok(cmd.to_string())
-    } else {
-        Err(Error::WrongClientInputFormat)
-    }
-}
-
-fn parse_arg_from_client_input(raw: &String) -> Result<String> {
-    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        let index = cmd.rfind(":");
-        if index.is_some() {
-            let split_cmd = &cmd[0..index.unwrap()];
-            Ok(split_cmd.to_string())
-        } else {
-            Ok(cmd.to_string())
-        }
-    } else {
-        Err(Error::WrongClientInputFormat)
-    }
-}
-
-fn parse_target_process_number_from_client_input(raw: &String) -> Result<Option<usize>> {
-    if let Some(cmd) = raw.split_whitespace().skip(1).next() {
-        if let Some(index) = cmd.rfind(":") {
-            let split_cmd = &cmd[index + 1..];
-            if let Ok(number) = split_cmd.parse::<usize>() {
-                return Ok(Some(number));
-            } else {
-                return Err(Error::WrongClientInputFormat);
-            }
-        }
-    }
-    Ok(None)
-}
-
-fn is_job_from_config_map(config: &mut Config, cmd: &String) -> bool {
-    let result = config.contains_key(cmd);
-    if result == true {
-        return true;
-    }
-    return false;
-}
-
-fn parse_client_input(
-    config: &mut Config,
-    raw: &String,
-) -> Result<(String, String, Option<usize>)> {
-    let client_cmd = parse_cmd_from_client_input(&raw)?;
-    let client_arg = parse_arg_from_client_input(&raw)?;
-    let client_process = parse_target_process_number_from_client_input(&raw)?;
-    if is_job_from_config_map(config, &client_arg) {
-        Ok((client_cmd, client_arg, client_process))
-    } else {
-        Err(Error::WrongClientInputFormat)
-    }
-}
-
 fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &String) -> Result<()> {
     let duration = Duration::from_millis(100);
     for stream in listener.incoming() {
@@ -132,7 +77,7 @@ fn server_routine(listener: &TcpListener, config: &mut Config, config_file: &Str
                             .map_err(|e| Error::IO(e.to_string()))?;
                         continue;
                     };
-                let job: &mut parser::job::Job = config.get_mut(&client_arg).unwrap();
+                let job: &mut Job = config.get_mut(&client_arg).unwrap();
                 let ret = match client_cmd.as_str() {
                     "start" => job.start(&client_arg, client_process),
                     "stop" => job.stop(&client_arg, client_process),
