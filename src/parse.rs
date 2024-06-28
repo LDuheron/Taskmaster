@@ -196,16 +196,19 @@ fn _parse_environment(raw: &RawConfig) -> Result<Option<HashMap<String, String>>
     let Some(Some(raw_env)) = raw.get(&field_name) else {
         return Ok(default);
     };
-    let env_entry: Vec<&str> = raw_env.split(",").collect();
+    let env_entries: Vec<&str> = raw_env.split(",").collect();
     let mut map: HashMap<String, String> = HashMap::new();
-    for entry in env_entry {
+    for entry in env_entries {
         let Some(pos_first_equal) = entry.find("=") else {
             return Err(Error::CantParseEnvEntry(entry.to_string()));
         };
-        let key = entry[..pos_first_equal].to_string();
-        let mut value: &str = &entry[pos_first_equal + 1..];
+        let key = entry[..pos_first_equal].trim().to_string();
+        if key.is_empty() {
+            return Err(Error::CantParseEnvEntry(entry.to_string()));
+        }
+        let mut value: &str = &entry[pos_first_equal + 1..].trim();
         if value.starts_with('"') && value.ends_with('"') {
-            value = &value[1..value.len() - 1];
+            value = &value[1..value.len() - 1].trim();
         }
         map.insert(key.to_string(), value.to_string());
     }
