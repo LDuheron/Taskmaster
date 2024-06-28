@@ -91,7 +91,16 @@ impl Config {
         Ok(())
     }
 
-    pub fn parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
+    pub fn parse_config_file(&mut self, config_path: &String) -> Result<()> {
+        let mut parser: Ini = Ini::new();
+        let cfg: ConfigParserContent = parser
+            .load(config_path)
+            .map_err(|e| Error::CantLoadFile(e.to_string()))?;
+        self._parse_content_of_parserconfig(cfg)?;
+        Ok(())
+    }
+
+    fn _parse_content_of_parserconfig(&mut self, cfg: ConfigParserContent) -> Result<()> {
         for entry in cfg {
             let entry_name: String = entry.0.clone();
             let job: Job = match parse_job(&entry.1) {
@@ -122,15 +131,6 @@ impl Config {
         }
         Ok(())
     }
-
-    pub fn parse_config_file(&mut self, config_path: &String) -> Result<()> {
-        let mut parser: Ini = Ini::new();
-        let cfg: ConfigParserContent = parser
-            .load(config_path)
-            .map_err(|e| Error::CantLoadFile(e.to_string()))?;
-        self.parse_content_of_parserconfig(cfg)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -149,7 +149,7 @@ mod tests {
     fn no_job() -> Result<()> {
         let (config_parser, mut config) = get_config_parser_and_config("".into());
         assert_eq!(
-            config.parse_content_of_parserconfig(config_parser),
+            config._parse_content_of_parserconfig(config_parser),
             Err(Error::NoJobEntry)
         );
         assert!(config.map.is_empty());
@@ -162,7 +162,7 @@ mod tests {
             "command=test
              numprocs=2",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert_eq!(val, Err(Error::NoJobEntry));
         assert!(config.map.is_empty());
         Ok(())
@@ -178,7 +178,7 @@ mod tests {
              [{job_name}]
              command={command}",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -199,7 +199,7 @@ mod tests {
             "[{job_name}]
              command= {command}",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -248,7 +248,7 @@ mod tests {
         umask=022
 ",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let mut job: &Job = config.map.get("netcat".into()).unwrap();
         assert_eq!(
             *job,
@@ -291,7 +291,7 @@ mod tests {
             "[test]
              command=",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -304,7 +304,7 @@ mod tests {
              numprocs: 2",
         ));
         assert_eq!(
-            config.parse_content_of_parserconfig(config_parser),
+            config._parse_content_of_parserconfig(config_parser),
             Err(Error::CantParseEntry {
                 entry_name: String::from("test"),
                 e: Error::FieldCommandIsNotSet.to_string(),
@@ -320,7 +320,7 @@ mod tests {
             "[test]
              command = nc -nvlp 5555",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get("test".into()).unwrap();
         assert_eq!(
             *job,
@@ -342,7 +342,7 @@ mod tests {
              command={command}
              numprocs=2",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -364,7 +364,7 @@ mod tests {
              command={command}
              numprocs=badnumprocs",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -379,7 +379,7 @@ mod tests {
              command={command}
              autostart=false",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -401,7 +401,7 @@ mod tests {
              command={command}
              autostart=badvalue",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -416,7 +416,7 @@ mod tests {
              command={command}
              autorestart=always",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -438,7 +438,7 @@ mod tests {
              command={command}
              autorestart=badvalue",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -453,7 +453,7 @@ mod tests {
              command={command}
              exitcodes=0, 2, 42",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -475,7 +475,7 @@ mod tests {
              command={command}
              exitcodes=1, 2, 5, asdf, 4",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -490,7 +490,7 @@ mod tests {
              command={command}
              startsecs=30",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -512,7 +512,7 @@ mod tests {
              command={command}
              startsecs=bad",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -527,7 +527,7 @@ mod tests {
              command={command}
              startretries=5",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -549,7 +549,7 @@ mod tests {
              command={command}
              startretries=bad",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -564,7 +564,7 @@ mod tests {
              command={command}
              stopsignal=INT",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -586,7 +586,7 @@ mod tests {
              command={command}
              stopsignal=bad",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -601,7 +601,7 @@ mod tests {
              command={command}
              stopwaitsecs=20",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -623,7 +623,7 @@ mod tests {
              command={command}
              stopwaitsecs=bad",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -638,7 +638,7 @@ mod tests {
              command={command}
              stderr=/dev/null",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -660,7 +660,7 @@ mod tests {
              command={command}
              stderr=",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -682,7 +682,7 @@ mod tests {
              command={command}
              stderr=bad path",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -697,7 +697,7 @@ mod tests {
              command={command}
              stdout=/dev/null",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -719,7 +719,7 @@ mod tests {
              command={command}
              stdout=bad path",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -734,7 +734,7 @@ mod tests {
              command={command}
              workdir=/tmp",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -756,7 +756,7 @@ mod tests {
              command={command}
              workdir=bad path",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -771,7 +771,7 @@ mod tests {
              command={command}
              umask=012",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -793,7 +793,7 @@ mod tests {
              command={command}
              umask=01234",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -808,7 +808,7 @@ mod tests {
              command={command}
              umask=abc",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -823,7 +823,7 @@ mod tests {
              command={command}
              umask=019",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -838,7 +838,7 @@ mod tests {
              command={command}
              environment=A=\"1\",B=\"2\"",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -863,7 +863,7 @@ mod tests {
              command={command}
              environment=A=\"1\",,B=\"2\"",
         ));
-        let val: Result<()> = config.parse_content_of_parserconfig(config_parser);
+        let val: Result<()> = config._parse_content_of_parserconfig(config_parser);
         assert!(matches!(val, Err(Error::CantParseEntry { .. })));
         assert!(config.map.is_empty());
         Ok(())
@@ -878,7 +878,7 @@ mod tests {
              command={command}
              environment=A=\"1\",B=\"2=5\"",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,
@@ -903,7 +903,7 @@ mod tests {
              command={command}
              environment=A=\"1\",B=\"\"\"",
         ));
-        config.parse_content_of_parserconfig(config_parser)?;
+        config._parse_content_of_parserconfig(config_parser)?;
         let job: &Job = config.map.get(&job_name).unwrap();
         assert_eq!(
             *job,

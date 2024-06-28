@@ -8,10 +8,7 @@ use config::Config;
 use error::{Error, Result};
 use job::Job;
 use logger::{log, Logger};
-use parse::{
-    parse_arg_from_client_input, parse_cmd_from_client_input,
-    parse_target_process_number_from_client_input,
-};
+use parse::parse_client_input;
 use std::env::args;
 use std::io::{prelude::*, ErrorKind};
 use std::net::TcpListener;
@@ -45,28 +42,6 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
             }
             RELOAD_CONFIG = false;
         }
-    }
-}
-
-fn is_job_from_config_map(config: &mut Config, cmd: &String) -> bool {
-    let result = config.contains_key(cmd);
-    if result == true {
-        return true;
-    }
-    return false;
-}
-
-fn parse_client_input(
-    config: &mut Config,
-    raw: &String,
-) -> Result<(String, String, Option<usize>)> {
-    let client_cmd = parse_cmd_from_client_input(&raw)?;
-    let client_arg = parse_arg_from_client_input(&raw)?;
-    let client_process = parse_target_process_number_from_client_input(&raw)?;
-    if is_job_from_config_map(config, &client_arg) {
-        Ok((client_cmd, client_arg, client_process))
-    } else {
-        Err(Error::WrongClientInputFormat)
     }
 }
 
