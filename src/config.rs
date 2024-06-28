@@ -55,7 +55,6 @@ impl Config {
     pub fn reload_config(&mut self, config_path: &String) -> Result<()> {
         let mut new_config: Config = Config::new();
         new_config.parse_config_file(config_path)?;
-        // println!("reload config with {}", config_path);
         for (job_name, new_job) in new_config.map.iter_mut() {
             match self.map.get_mut(job_name) {
                 // job is changed case
@@ -81,7 +80,6 @@ impl Config {
             };
         }
         // job is deleted
-        // yes this is horrible, idk how to improve this
         for (job_name, _old_job) in self.map.clone().iter() {
             if new_config.contains_key(job_name) == false {
                 self.map.get_mut(job_name).unwrap().stop_job_now();
