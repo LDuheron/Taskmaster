@@ -2,6 +2,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    Default(String),
     BadNumberOfArguments(String),
     CantLoadFile(String),
     NoJobEntry,
@@ -20,15 +21,14 @@ pub enum Error {
         msg: String,
     },
     FieldCommandIsNotSet,
-    WrongClientInputFormat,
     CantParseEnvEntry(String),
     CantOpenLogFile(String),
-    CommandIsNotSuported(String),
+    CommandIsNotSupported(String),
     IO(String),
     StartJobFail(String),
     StopJobFail(String),
     StatusJobFail(String),
-    Default(String),
+    ParseClientInput(String),
 }
 
 impl core::fmt::Display for Error {
