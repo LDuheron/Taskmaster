@@ -1,5 +1,9 @@
 # TASKMASTER
 
+<!--toc:start-->
+- [Configuration](#configuration)
+<!--toc:end-->
+
 The project taskmaster from 42Networks aims to make a fully fledged job control daemon.
 
 "Your job here is to make a fully-fledged job control daemon. A pretty good example of this would be supervisor. For the sake of keeping it simple, your program will not run as root, and does not HAVE to be a daemon. It will be started via shell, and do its job while providing a control shell to the user".
@@ -10,19 +14,19 @@ daemon -> programme en arriere plan
 
 Avoir deux "programmes" ? un pour le daemon et un pour linterface de communication
 
-## Configuration fields
+## Configuration
 
-- command
-- numprocs
-- autostart
-- autorestart
-- exitcodes
-- startsecs
-- startretries
-- stopsignals
-- stopwaitsecs
-- stdout
-- stderr
-- workdir
-- environment
-- umask
+- command: `command [arguments]`
+- numprocs: `numeric`
+- autostart: `true | false`
+- autorestart: `never | unexpected | always`
+- exitcodes: `numeric[, numeric...]`
+- startsecs: `numeric`
+- startretries: `numeric`
+- stopsignal: `hup | int | quit | kill | usr1 | usr2 | term` (not case sensitive)
+- stopwaitsecs: `numeric`
+- stdout: `filename`
+- stderr: `filename`
+- workdir: `filename`
+- environment: `key=value[, key=value...]`
+- umask: `033` (octal value for umask)
