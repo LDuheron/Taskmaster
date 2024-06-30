@@ -1,6 +1,7 @@
 use crate::logger::log;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::OpenOptions;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
@@ -103,7 +104,6 @@ impl ProcessInfo {
     }
 }
 
-#[derive(Debug)]
 pub struct Job {
     pub command: String,
     pub arguments: Option<Vec<String>>,
@@ -121,6 +121,46 @@ pub struct Job {
     pub work_dir: Option<String>,
     pub umask: Option<u32>,
     pub processes: Vec<ProcessInfo>,
+}
+
+impl fmt::Debug for Job {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Job [\n\
+                \tcommand: {},\n\
+                \targuments: {:?},\n\
+                \tnum_procs: {},\n\
+                \tauto_start: {},\n\
+                \tauto_restart: {:?},\n\
+                \texit_codes: {:?},\n\
+                \tstart_secs: {},\n\
+                \tstart_retries: {},\n\
+                \tstop_signal: {:?},\n\
+                \tstop_wait_secs: {},\n\
+                \tstderr_file: {:?},\n\
+                \tstdout_file: {:?},\n\
+                \tenvironment: {:?},\n\
+                \twork_dir: {:?},\n\
+                \tumask: {:?}\n\
+            ]",
+            self.command,
+            self.arguments,
+            self.num_procs,
+            self.auto_start,
+            self.auto_restart,
+            self.exit_codes,
+            self.start_secs,
+            self.start_retries,
+            self.stop_signal,
+            self.stop_wait_secs,
+            self.stderr_file,
+            self.stdout_file,
+            self.environment,
+            self.work_dir,
+            self.umask
+        )
+    }
 }
 
 impl Default for Job {
