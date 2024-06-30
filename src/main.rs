@@ -33,10 +33,11 @@ fn try_reload_config(config: &mut Config, config_file: &String) {
     unsafe {
         if RELOAD_CONFIG {
             match config.reload_config(&config_file) {
-                Err(e) => {
-                    log(&format!("ERROR: Can't reload file: {e}"));
+                Err(_) => {
+                    log("ERROR: Can't reload file");
                 }
                 Ok(()) => {
+                    println!("Reloaded config: {config:#?}");
                     log(&format!("INFO: Config file is reloaded"));
                 }
             }
