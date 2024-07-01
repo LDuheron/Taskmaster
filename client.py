@@ -72,7 +72,7 @@ class InputInterpretor(cmd.Cmd):
 		print("taskmaster config file is reloaded")
 
 	def do_kill(self, arg):
-		"""Reload the config file"""
+		"""Kill the server"""
 		os.system("pkill -int taskmaster")
 		print("taskmaster server is killed")
 

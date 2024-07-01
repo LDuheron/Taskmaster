@@ -7,3 +7,5 @@ log.txt
 err
 out
 a.out
+*.test
+bin/
