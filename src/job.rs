@@ -439,7 +439,7 @@ impl Job {
         process.nb_retries = 0;
         process.child = None;
         process.set_state(ProcessStates::Fatal);
-		log(&format!(
+        log(&format!(
             "INFO: {job_name}:{process_index} reached retry limit"
         ));
         log(&format!(
@@ -489,13 +489,6 @@ impl Job {
             panic!("Why process state is RUNNING but child is NONE ????");
         };
         match child.try_wait() {
-            Ok(Some(status)) if status.code().is_none() => {
-                // terminated by signal
-                process.set_state(ProcessStates::Stopped);
-                log(&format!(
-                    "INFO: {job_name}:{process_index} is now in STOPPED state"
-                ));
-            }
             Ok(Some(_)) => {
                 process.set_state(ProcessStates::Exited);
                 log(&format!(
@@ -519,14 +512,15 @@ impl Job {
             return;
         };
         match child.try_wait() {
+            // terminated by signal
             Ok(Some(status)) if status.code().is_none() => {
-                log(&format!(
-                    "FATAL: {job_name}:{process_index} Unexpected error while exiting"
-                ));
-                panic!("Why process state is EXITED but it's terminated by SIGNAL ????");
+                if self.auto_restart == AutorestartOptions::Always
+                    || self.auto_restart == AutorestartOptions::UnexpectedExit
+                {
+                    let _ = self.start(job_name, Some(process_index));
+                }
             }
             Ok(Some(status)) => {
-                // is safe: process can't be in exited state and terminated by signal
                 let code: i32 = status.code().unwrap();
                 if self.auto_restart == AutorestartOptions::Always
                     || (self.auto_restart == AutorestartOptions::UnexpectedExit
